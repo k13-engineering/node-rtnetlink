@@ -39,3 +39,22 @@ describe("performing requests", function () {
     });
   });
 });
+
+describe("high level APIs", () => {
+  describe("link", () => {
+    it("should create and destroy bridges without error", async() => {
+      const rt = await rtnetlink.open();
+
+      try {
+        const newLink = await rt.link.createLink({
+          "linkinfo": {
+            "kind": "bridge"
+          }
+        });
+        await newLink.deleteLink();
+      } finally {
+        await rt.close();
+      }
+    });
+  });
+});

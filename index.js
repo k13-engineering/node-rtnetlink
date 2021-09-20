@@ -1,6 +1,7 @@
 import assert from "assert";
 import EventEmitter from "events";
 import netlink from "../node-netlink/lib/index.js";
+import linkApi from "./link.js"
 
 import ifinfo from "./ifinfo.js";
 import RTA from "./rta.js";
@@ -60,6 +61,26 @@ const open = async () => {
     emitter.emit("message", convert(msg));
   });
 
+  const tryTalk = async(obj) => {
+    assert(typeof obj.header === "object", "header must be given and of type object");
+    assert(!isNaN(obj.header.nlmsg_type), "header.nlmsg_type must be given");
+
+    const m = marshallers[obj.header.nlmsg_type];
+    assert(m, "no marshaller available for nlmsg_type " + obj.header.nlmsg_type);
+
+    const nlResult = await nl.tryTalk({
+      "header": obj.header,
+      "payload": m.marshal(obj)
+    });
+
+    const { errorCode, packets } = nlResult;
+
+    return {
+      errorCode,
+      "packets": packets.map((part) => convert(part))
+    };
+  };
+
   const talk = async(obj) => {
     assert(typeof obj.header === "object", "header must be given and of type object");
     assert(!isNaN(obj.header.nlmsg_type), "header.nlmsg_type must be given");
@@ -75,11 +96,22 @@ const open = async () => {
     return result.map((part) => convert(part));
   };
 
-  return {
+  const rt = {
     talk,
+    tryTalk,
     "on": emitter.on.bind(emitter),
     "once": emitter.once.bind(emitter),
     "close": () => nl.close()
+  };
+
+  return {
+    "talk": rt.talk,
+    "on": rt.on,
+    "once": rt.once,
+
+    "link": linkApi.create({ rt }),
+
+    "close": rt.close
   };
 };
 
