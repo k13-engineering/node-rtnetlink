@@ -1,11 +1,9 @@
 import assert from "assert";
 import EventEmitter from "events";
-
-import netlink from "node-netlink";
+import netlink from "../node-netlink/lib/index.js";
 
 import ifinfo from "./ifinfo.js";
 import RTA from "./rta.js";
-
 
 const NETLINK_ROUTE = 0;
 
@@ -27,25 +25,19 @@ const marshallers = {
 };
 
 const convert = (msg) => {
-  let converted = [];
+  const m = marshallers[msg.header.nlmsg_type];
 
-  msg.forEach((part) => {
-    const m = marshallers[part.header.nlmsg_type];
+  let result;
 
-    let result;
+  if (m) {
+    result = Object.assign({}, {
+      "header": msg.header
+    }, m.unmarshal(msg.payload));
+  } else {
+    result = msg;
+  }
 
-    if (m) {
-      result = Object.assign({}, {
-        "header": part.header
-      }, m.unmarshal(part.payload));
-    } else {
-      result = part;
-    }
-
-    converted = converted.concat([result]);
-  });
-
-  return converted;
+  return result;
 };
 
 const {
@@ -58,29 +50,33 @@ const {
   NLM_F_EXCL
 } = netlink;
 
-const open = () => {
+const open = async () => {
   const emitter = new EventEmitter();
 
-  const nl = netlink.open({ "family": NETLINK_ROUTE })
+  const nl = await netlink.open({
+    "family": NETLINK_ROUTE
+  });
   nl.on("message", (msg) => {
     emitter.emit("message", convert(msg));
   });
 
+  const talk = async(obj) => {
+    assert(typeof obj.header === "object", "header must be given and of type object");
+    assert(!isNaN(obj.header.nlmsg_type), "header.nlmsg_type must be given");
+
+    const m = marshallers[obj.header.nlmsg_type];
+    assert(m, "no marshaller available for nlmsg_type " + obj.header.nlmsg_type);
+
+    const result = await nl.talk({
+      "header": obj.header,
+      "payload": m.marshal(obj)
+    });
+
+    return result.map((part) => convert(part));
+  };
+
   return {
-    "talk": async(obj) => {
-      assert(typeof obj.header === "object", "header must be given and of type object");
-      assert(!isNaN(obj.header.nlmsg_type), "header.nlmsg_type must be given");
-
-      const m = marshallers[obj.header.nlmsg_type];
-      assert(m, "no marshaller available for nlmsg_type " + obj.header.nlmsg_type);
-
-      const result = await nl.talk({
-        "header": obj.header,
-        "payload": m.marshal(obj)
-      });
-
-      return convert(result);
-    },
+    talk,
     "on": emitter.on.bind(emitter),
     "once": emitter.once.bind(emitter),
     "close": () => nl.close()

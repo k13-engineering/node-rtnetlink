@@ -7,9 +7,9 @@ describe("opening", function () {
   this.timeout(5000);
 
   describe("normal case", () => {
-    it("should open without error", () => {
-      const rt = rtnetlink.open();
-      rt.close();
+    it("should open without error", async() => {
+      const rt = await rtnetlink.open();
+      await rt.close();
     });
   });
 });
@@ -19,13 +19,13 @@ describe("performing requests", function () {
 
   describe("RTM_GETLINK", () => {
     it("should work properly", async() => {
-      const rt = rtnetlink.open();
+      const rt = await rtnetlink.open();
 
       try {
         const result = await rt.talk({
           "header": {
             "nlmsg_type": rtnetlink.RTM_GETLINK,
-            "nlmsg_flags": rtnetlink.NLM_F_REQUEST | rtnetlink.NLM_F_DUMP
+            "nlmsg_flags": rtnetlink.NLM_F_REQUEST | rtnetlink.NLM_F_DUMP | rtnetlink.NLM_F_ACK
           },
           "ifi": {
             "ifi_family": AF_PACKET
@@ -34,7 +34,7 @@ describe("performing requests", function () {
 
         assert(Array.isArray(result), "result of talk() should be an array");
       } finally {
-        rt.close();
+        await rt.close();
       }
     });
   });
