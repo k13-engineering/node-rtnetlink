@@ -1,6 +1,6 @@
-const ref = require("ref");
-const StructType = require("ref-struct");
-const RTA = require("./rta.js");
+import ref from "ref-napi";
+import StructType from "ref-struct-napi";
+import RTA from "./rta.js";
 
 const NLMSG_ALIGN = (addr) => (addr + 3) & ~3;
 
@@ -37,7 +37,7 @@ const unmarshal = (data) => {
   };
 };
 
-module.exports = {
+export default {
   marshal,
   unmarshal
 };
