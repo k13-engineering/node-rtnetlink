@@ -1,5 +1,5 @@
-const assert = require("assert");
-const rtnetlink = require("../index.js");
+import assert from "assert";
+import rtnetlink from "../index.js";
 
 const AF_PACKET = 17;
 

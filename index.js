@@ -1,10 +1,10 @@
-const assert = require("assert");
-const EventEmitter = require("events");
+import assert from "assert";
+import EventEmitter from "events";
 
-const netlink = require("node-netlink");
+import netlink from "node-netlink";
 
-const ifinfo = require("./ifinfo.js");
-const RTA = require("./rta.js");
+import ifinfo from "./ifinfo.js";
+import RTA from "./rta.js";
 
 
 const NETLINK_ROUTE = 0;
@@ -87,7 +87,7 @@ const open = () => {
   };
 };
 
-module.exports = {
+export default {
   IFLA_IFNAME,
   IFLA_ADDR,
   IFLA_MASTER,

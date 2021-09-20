@@ -1,6 +1,6 @@
-const assert = require("assert");
-const ref = require("ref");
-const StructType = require("ref-struct");
+import assert from "assert";
+import ref from "ref-napi";
+import StructType from "ref-struct-napi";
 
 const RTA_ALIGN = (addr) => (addr + 3) & ~3;
 
@@ -56,7 +56,7 @@ const unmarshal = (data) => {
   return result;
 };
 
-module.exports = {
+export default {
   marshal,
   unmarshal
 };
