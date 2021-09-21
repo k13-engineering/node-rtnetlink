@@ -1,6 +1,4 @@
 import assert from "assert";
-import ref from "ref-napi";
-import StructType from "ref-struct-napi";
 import struct from "../node-ya-struct/lib/index.js";
 
 const RTA_ALIGN = (addr) => ((addr + 3n) / 4n) * 4n;
