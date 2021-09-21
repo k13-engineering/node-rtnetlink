@@ -1,27 +1,28 @@
 import assert from "assert";
 import ref from "ref-napi";
 import StructType from "ref-struct-napi";
+import struct from "../node-ya-struct/lib/index.js";
 
-const RTA_ALIGN = (addr) => (addr + 3) & ~3;
+const RTA_ALIGN = (addr) => ((addr + 3n) / 4n) * 4n;
 
-const rtattr = StructType({
-  "rta_len": ref.types.ushort,
-  "rta_type": ref.types.ushort
-});
+const rtattr = struct.define(({ field }) => {
+  field.UInt16("rta_len");
+  field.UInt16("rta_type");
+}).forHost();
 
 const marshal = (attrs) => {
   let result = Buffer.alloc(0);
 
   attrs.forEach((attr) => {
-    let len = RTA_ALIGN(rtattr.size + attr.data.length);
+    let len = RTA_ALIGN(BigInt(rtattr.size)) + BigInt(attr.data.length);
 
-    const header = new rtattr({
+    const header = rtattr.format({
       "rta_len": len,
       "rta_type": attr.rta_type
     });
 
-    const data = Buffer.concat([header.ref(), attr.data]);
-    const padding = Buffer.alloc(len - data.length);
+    const data = Buffer.concat([header, attr.data]);
+    const padding = Buffer.alloc(Number(len) - data.length);
 
     result = Buffer.concat([result, data, padding]);
   });
@@ -35,18 +36,16 @@ const unmarshal = (data) => {
   let offset = 0;
 
   while (offset < data.length) {
-    // console.log("offset = " + offset);
-
-    const header = new rtattr(data.slice(offset, offset + rtattr.size));
+    const header = rtattr.parse(data.slice(offset, offset + rtattr.size));
 
     result = result.concat([{
       // "rta_len": header.rta_len,
       "rta_type": header.rta_type,
-      "data": data.slice(offset + rtattr.size, offset + header.rta_len)
+      "data": data.slice(offset + rtattr.size, offset + Number(header.rta_len))
     }]);
 
-    assert(header.rta_len > 0);
-    offset += RTA_ALIGN(header.rta_len);
+    assert(header.rta_len > 0n);
+    offset += Number(RTA_ALIGN(BigInt(header.rta_len)));
   }
 
   return result;
@@ -68,21 +67,21 @@ const types = {
   "uint32": {
     "marshal": (value) => {
       const buf = Buffer.alloc(4);
-      buf.writeUInt32LE(value);
+      buf.writeUInt32LE(Number(value));
       return buf;
     },
     "unmarshal": (buf) => {
-      return buf.readUInt32LE(0);
+      return BigInt(buf.readUInt32LE(0));
     }
   },
   "ifindex": {
     "marshal": (value) => {
       const buf = Buffer.alloc(4);
-      buf.writeUInt32LE(value);
+      buf.writeUInt32LE(Number(value));
       return buf;
     },
     "unmarshal": (buf) => {
-      return buf.readUInt32LE(0);
+      return BigInt(buf.readUInt32LE(0));
     }
   },
   "hwaddr": {

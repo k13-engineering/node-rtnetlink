@@ -26,7 +26,8 @@
   "homepage": "https://github.com/k13-engineering/node-rtnetlink#readme",
   "dependencies": {
     "ref-napi": "^3.0.1",
-    "ref-struct-napi": "^1.1.1"
+    "ref-struct-napi": "^1.1.1",
+    "ya-struct": "^0.0.2"
   },
   "devDependencies": {
     "mocha": "^8.0.0"
