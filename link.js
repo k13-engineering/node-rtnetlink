@@ -6,6 +6,8 @@ import linkinfoMarshaller from "./lib/link/linkinfo.js";
 import linkRTAs from "./lib/link/rtattr.js";
 import linkFlags from "./lib/link/flags.js";
 
+import netlink from "../node-netlink/lib/index.js";
+
 const AF_UNSPEC = 0n;
 const AF_PACKET = 17n;
 
@@ -18,13 +20,14 @@ const IFLA_MASTER = 0x0An;
 const IFLA_LINKINFO = 18n;
 
 const EEXIST = 17;
+const ENODEV = 19;
 
 const linkFromIndex = ({ rt, ifindex }) => {
   const fetch = async({ provideUnknown = false } = {}) => {
     const result = await rt.talk({
       "header": {
         "nlmsg_type": rtnetlink.RTM_GETLINK,
-        "nlmsg_flags": rtnetlink.NLM_F_REQUEST | rtnetlink.NLM_F_MATCH | rtnetlink.NLM_F_ACK
+        "nlmsg_flags": rtnetlink.NLM_F_REQUEST/* | rtnetlink.NLM_F_MATCH */| rtnetlink.NLM_F_ACK
       },
       "ifi": {
         "ifi_family": AF_PACKET,
@@ -106,32 +109,57 @@ const create = ({ rt }) => {
     return linkFromIndex({ rt, ifindex });
   };
 
-  const findBy = async({ flags, family, ...attributes }) => {
+  const findAllBy = async({ flags, family, type, ...attributes }) => {
     const rtattrs = linkRTAs.marshal(attributes);
 
-    const result = await rt.talk({
+    const nlmsg_flags = rtnetlink.NLM_F_REQUEST /*| rtnetlink.NLM_F_MATCH*/ | rtnetlink.NLM_F_ACK;
+
+    const { errorCode, packets } = await rt.tryTalk({
       "header": {
         "nlmsg_type": rtnetlink.RTM_GETLINK,
-        "nlmsg_flags": rtnetlink.NLM_F_REQUEST | rtnetlink.NLM_F_MATCH | rtnetlink.NLM_F_ACK
+        "nlmsg_flags": nlmsg_flags
       },
       "ifi": {
         "ifi_family": family || AF_UNSPEC,
+        "ifi_type": type || 0n,
         "ifi_flags": linkFlags.mask(flags || {}),
         "ifi_change": linkFlags.changeMask(flags || {})
       },
       "rta": rtattrs
     });
 
-    if(result.length === 0) {
-      throw new Error(`interface with name "${ifname}" not found`);
-    } else if(result.length > 1) {
-      throw new Error(`got multiple responses for ifname query`);
+    if (errorCode === ENODEV) {
+      return [];
+    } else if (errorCode !== 0) {
+      throw netlink.createErrorFromErrorCode({ errorCode });
     }
 
-    const response = result[0];
-    const ifindex = response.ifi.ifi_index;
+    return packets.map((response) => {
+      const ifindex = response.ifi.ifi_index;
+      return fromIndex({ ifindex });
+    });
+  };
 
-    return fromIndex({ ifindex });
+  const tryFindOneBy = async({ flags, family, type, ...attributes }) => {
+    const result = await findAllBy({ flags, family, type, ...attributes });
+
+    if (result.length !== 1) {
+      return undefined;
+    } else {
+      return result[0];
+    }
+  };
+
+  const findOneBy = async({ flags, family, type, ...attributes }) => {
+    const result = await findAllBy({ flags, family, type, ...attributes });
+
+    if(result.length === 0) {
+      throw new Error(`interface not found`);
+    } else if(result.length > 1) {
+      throw new Error(`got multiple responses for query`);
+    }
+
+    return result[0];
   };
 
   const tryCreateLink = async(opts) => {
@@ -169,7 +197,7 @@ const create = ({ rt }) => {
       if(errorCode === 0) {
         return fromIndex({ ifindex });
       } else if(errorCode !== EEXIST) {
-        throw new Error(`failed to create link: ${errorCode}`);
+        throw netlink.createErrorFromErrorCode({ errorCode, message: "failed to create link" });
       }
     }
 
@@ -178,7 +206,9 @@ const create = ({ rt }) => {
 
   return {
     fromIndex,
-    findBy,
+    findAllBy,
+    tryFindOneBy,
+    findOneBy,
     createLink
   }
 };
