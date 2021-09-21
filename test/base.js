@@ -1,7 +1,7 @@
 import assert from "assert";
 import rtnetlink from "../index.js";
 
-const AF_PACKET = 17;
+const AF_PACKET = 17n;
 
 describe("opening", function () {
   this.timeout(5000);

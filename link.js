@@ -6,16 +6,16 @@ import linkinfoMarshaller from "./lib/link/linkinfo.js";
 import linkRTAs from "./lib/link/rtattr.js";
 import linkFlags from "./lib/link/flags.js";
 
-const AF_UNSPEC = 0;
-const AF_PACKET = 17;
+const AF_UNSPEC = 0n;
+const AF_PACKET = 17n;
 
-const IFLA_ADDRESS = 0x01;
-const IFLA_BROADCAST = 0x02;
-const IFLA_IFNAME = 0x03;
-const IFLA_MTU = 0x04;
-const IFLA_LINK = 0x05;
-const IFLA_MASTER = 0x0A;
-const IFLA_LINKINFO = 18;
+const IFLA_ADDRESS = 0x01n;
+const IFLA_BROADCAST = 0x02n;
+const IFLA_IFNAME = 0x03n;
+const IFLA_MTU = 0x04n;
+const IFLA_LINK = 0x05n;
+const IFLA_MASTER = 0x0An;
+const IFLA_LINKINFO = 18n;
 
 const EEXIST = 17;
 

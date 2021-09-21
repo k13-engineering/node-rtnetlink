@@ -6,18 +6,18 @@ import linkApi from "./link.js"
 import ifinfo from "./ifinfo.js";
 import RTA from "./rta.js";
 
-const NETLINK_ROUTE = 0;
+const NETLINK_ROUTE = 0n;
 
-const RTM_NEWLINK = 16;
-const RTM_DELLINK = 17;
-const RTM_GETLINK = 18;
+const RTM_NEWLINK = 16n;
+const RTM_DELLINK = 17n;
+const RTM_GETLINK = 18n;
 
-const IFLA_IFNAME = 3;
-const IFLA_ADDR = 1;
-const IFLA_MASTER = 10;
-const IFLA_LINK = 5;
-const IFLA_LINKINFO = 18;
-const IFLA_INFO_KIND = 1;
+const IFLA_IFNAME = 3n;
+const IFLA_ADDR = 1n;
+const IFLA_MASTER = 10n;
+const IFLA_LINK = 5n;
+const IFLA_LINKINFO = 18n;
+const IFLA_INFO_KIND = 1n;
 
 const marshallers = {
   [RTM_GETLINK]: ifinfo,
@@ -48,7 +48,8 @@ const {
   NLM_F_DUMP,
   NLM_F_ACK,
   NLM_F_CREATE,
-  NLM_F_EXCL
+  NLM_F_EXCL,
+  NLM_F_MATCH
 } = netlink;
 
 const open = async () => {
@@ -62,8 +63,8 @@ const open = async () => {
   });
 
   const tryTalk = async(obj) => {
-    assert(typeof obj.header === "object", "header must be given and of type object");
-    assert(!isNaN(obj.header.nlmsg_type), "header.nlmsg_type must be given");
+    assert.strictEqual(typeof obj.header, "object", "header must be given and of type object");
+    assert.strictEqual(typeof obj.header.nlmsg_type, "bigint", "header.nlmsg_type must be given and of type bigint");
 
     const m = marshallers[obj.header.nlmsg_type];
     assert(m, "no marshaller available for nlmsg_type " + obj.header.nlmsg_type);
@@ -82,8 +83,8 @@ const open = async () => {
   };
 
   const talk = async(obj) => {
-    assert(typeof obj.header === "object", "header must be given and of type object");
-    assert(!isNaN(obj.header.nlmsg_type), "header.nlmsg_type must be given");
+    assert.strictEqual(typeof obj.header, "object", "header must be given and of type object");
+    assert.strictEqual(typeof obj.header.nlmsg_type, "bigint", "header.nlmsg_type must be given");
 
     const m = marshallers[obj.header.nlmsg_type];
     assert(m, "no marshaller available for nlmsg_type " + obj.header.nlmsg_type);
@@ -130,6 +131,7 @@ export default {
   NLM_F_ACK,
   NLM_F_CREATE,
   NLM_F_EXCL,
+  NLM_F_MATCH,
 
   RTM_GETLINK,
   RTM_NEWLINK,
