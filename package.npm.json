@@ -1,0 +1,38 @@
+{
+  "name": "node-rtnetlink",
+  "type": "module",
+  "description": "Linux rtnetlink for Node.js: list, create, modify and delete network interfaces",
+  "publishConfig": {
+    "access": "public"
+  },
+  "files": [
+    "dist"
+  ],
+  "main": "dist/lib/index.js",
+  "scripts": {},
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/k13-engineering/node-rtnetlink.git"
+  },
+  "keywords": [
+    "rtnetlink",
+    "netlink",
+    "link",
+    "network",
+    "interfaces",
+    "linux",
+    "typescript"
+  ],
+  "os": [
+    "linux"
+  ],
+  "engines": {
+    "node": ">=24"
+  },
+  "author": "Simon Kadisch",
+  "license": "LGPL 2.1",
+  "bugs": {
+    "url": "https://github.com/k13-engineering/node-rtnetlink/issues"
+  },
+  "homepage": "https://github.com/k13-engineering/node-rtnetlink#readme"
+}
