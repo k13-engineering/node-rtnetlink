@@ -2,8 +2,6 @@ import {
   IFLA_ADDRESS,
   IFLA_BROADCAST,
   IFLA_IFNAME,
-  IFLA_INFO_KIND,
-  IFLA_INFO_SLAVE_KIND,
   IFLA_LINK,
   IFLA_LINKINFO,
   IFLA_MASTER,
@@ -12,22 +10,14 @@ import {
 } from "./constants.ts";
 import {
   bytesCodec,
-  formatAttributes,
-  parseAttributes,
   stringCodec,
   typeOfAttribute,
   u32Codec,
   type TAttributeCodec,
   type TRtattr
 } from "./rtattr.ts";
+import { linkinfoCodec, type TLinkinfo } from "./linkinfo.ts";
 import type { TRtnetlinkStructures } from "./structures.ts";
-
-type TLinkinfo = {
-  // the type of the link, e.g. "bridge", "veth" or "dummy"
-  kind?: string;
-  // the type of the master this link is a port of, e.g. "bridge"
-  slaveKind?: string;
-};
 
 type TLinkAttributes = {
   name?: string;
@@ -40,34 +30,6 @@ type TLinkAttributes = {
   // ifindex of the lower link of a virtual link, e.g. the parent of a macvlan or vlan link
   linkIndex?: number;
   linkinfo?: TLinkinfo;
-};
-
-const linkinfoCodec: TAttributeCodec<TLinkinfo> = {
-  format: ({ value, structures }) => {
-    const { kind, slaveKind } = value;
-
-    const attributes = [
-      ...(kind === undefined ? [] : [{ rta_type: IFLA_INFO_KIND, data: stringCodec.format({ value: kind, structures }) }]),
-      ...(slaveKind === undefined ? [] : [{ rta_type: IFLA_INFO_SLAVE_KIND, data: stringCodec.format({ value: slaveKind, structures }) }]),
-    ];
-
-    return formatAttributes({ attributes, structures });
-  },
-  parse: ({ data, structures }) => {
-    return parseAttributes({ data, structures }).reduce((linkinfo: TLinkinfo, attribute) => {
-      const type = typeOfAttribute({ attribute });
-
-      if (type === IFLA_INFO_KIND) {
-        return { ...linkinfo, kind: stringCodec.parse({ data: attribute.data, structures }) };
-      }
-
-      if (type === IFLA_INFO_SLAVE_KIND) {
-        return { ...linkinfo, slaveKind: stringCodec.parse({ data: attribute.data, structures }) };
-      }
-
-      return linkinfo;
-    }, {});
-  },
 };
 
 type TLinkAttributeName = keyof TLinkAttributes;
@@ -159,5 +121,4 @@ export type {
   TParsedLinkAttributes,
   TLinkAttributes,
   TLinkAttributeName,
-  TLinkinfo,
 };

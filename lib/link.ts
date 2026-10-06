@@ -83,7 +83,7 @@ const attributeMatches = ({ name, expected, actual }: { name: string, expected: 
   }
 
   return Object.entries(expected as object).every(([key, value]) => {
-    return (actual as Record<string, unknown> | undefined)?.[key] === value;
+    return isDeepStrictEqual((actual as Record<string, unknown> | undefined)?.[key], value);
   });
 };
 

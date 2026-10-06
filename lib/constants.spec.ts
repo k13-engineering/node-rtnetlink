@@ -13,7 +13,9 @@ const printStatementFor = ({ name }: { name: string }) => {
 
 // enums of the kernel headers are no macros, so they are printed directly
 const enumNames = new Set(Object.keys(constants).filter((name) => {
-  return name.startsWith("IFLA_") || name.startsWith("RTM_") || name.startsWith("IFF_");
+  return ["IFLA_", "RTM_", "IFF_", "MACVLAN_"].some((prefix) => {
+    return name.startsWith(prefix);
+  });
 }));
 
 const statementFor = ({ name }: { name: string }) => {

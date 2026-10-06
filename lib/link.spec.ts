@@ -209,6 +209,18 @@ describe("link", () => {
       assert.strictEqual(info.flags.IFF_UP, true);
     });
 
+    it("should create virtual links on a lower link", async () => {
+      const { link } = createTestSetup();
+
+      const created = await link.createLink({ name: "macvtap0", linkIndex: 2, linkinfo: { kind: "macvtap", data: { mode: "bridge" } } });
+
+      const info = await created.fetch();
+      assert.strictEqual(info.linkIndex, 2);
+      assert.deepStrictEqual(info.linkinfo, { kind: "macvtap", data: { mode: "bridge" } });
+      assert.deepStrictEqual(ifindexesOf({ links: await link.findAllBy({ linkinfo: { data: { mode: "bridge" } } }) }), [created.ifindex]);
+      assert.deepStrictEqual(await link.findAllBy({ linkinfo: { data: { mode: "vepa" } } }), []);
+    });
+
     it("should create links without flags", async () => {
       const { link } = createTestSetup();
 

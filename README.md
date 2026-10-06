@@ -180,7 +180,18 @@ A link (`TLink`) has:
 | `txqlen` | `IFLA_TXQLEN` | `number` |
 | `masterIndex` | `IFLA_MASTER` | `number`, 0 removes the link from its master |
 | `linkIndex` | `IFLA_LINK` | `number`, the lower link of a virtual link, e.g. the parent of a macvlan link |
-| `linkinfo` | `IFLA_LINKINFO` | `{ kind?: string, slaveKind?: string }` |
+| `linkinfo` | `IFLA_LINKINFO` | `{ kind?: string, slaveKind?: string, data?: TLinkinfoData }` |
+
+`linkinfo.data` holds the kind specific attributes of `IFLA_INFO_DATA`. They are supported for `macvlan` and `macvtap` links, as `{ mode?: "private" | "vepa" | "bridge" | "passthru" | "source" }`, the kernel uses `"vepa"` if the mode is omitted. For other kinds, `data` is left out when parsing, and setting it throws.
+
+```ts
+const eth0 = await rt.link.findOneBy({ name: "eth0" });
+const macvtap = await rt.link.createLink({
+  name: "macvtap0",
+  linkIndex: eth0.ifindex,
+  linkinfo: { kind: "macvtap", data: { mode: "bridge" } },
+});
+```
 
 ### Link flags
 
@@ -214,7 +225,7 @@ Pass `hostStructures` as `structures`, or `createRtnetlinkStructuresFor({ abi })
 
 ### Constants
 
-`AF_UNSPEC`, `AF_PACKET`, `RTM_*LINK`, `RTMGRP_LINK`, the attribute types `IFLA_*` and `IFLA_INFO_*`, `NLA_F_*`, `NLA_TYPE_MASK` and the link flags `IFF_*` are exported as `bigint`s.
+`AF_UNSPEC`, `AF_PACKET`, `RTM_*LINK`, `RTMGRP_LINK`, the attribute types `IFLA_*`, `IFLA_INFO_*` and `IFLA_MACVLAN_*`, the macvlan modes `MACVLAN_MODE_*`, `NLA_F_*`, `NLA_TYPE_MASK` and the link flags `IFF_*` are exported as `bigint`s.
 
 ## Migrating from 0.0.x
 

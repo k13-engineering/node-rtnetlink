@@ -76,6 +76,11 @@ describe("node-rtnetlink on the host kernel", () => {
     });
     assert.deepStrictEqual(result.bridgeIndexes, [result.bridgeIndex]);
     assert.match(result.duplicate, /creating link failed with EEXIST/);
+    assert.deepStrictEqual(result.macvtap, {
+      lowerIndex: result.macvtap.lowerIndex,
+      linkIndex: result.macvtap.lowerIndex,
+      linkinfo: { kind: "macvtap", data: { mode: "bridge" } },
+    });
     assert.deepStrictEqual(result.remaining, ["lo"]);
   });
 });

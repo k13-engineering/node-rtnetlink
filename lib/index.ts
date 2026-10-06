@@ -65,7 +65,13 @@ export type {
   TLinkInfo,
   TLinkCriteria,
 } from "./link.ts";
-export type { TLinkAttributes, TLinkAttributeName, TLinkinfo } from "./link-attributes.ts";
+export type { TParsedLinkAttributes, TLinkAttributes, TLinkAttributeName } from "./link-attributes.ts";
+export type {
+  TLinkinfo,
+  TLinkinfoData,
+  TMacvlanData,
+  TMacvlanMode,
+} from "./linkinfo.ts";
 export type { TLinkFlagName, TLinkFlags } from "./link-flags.ts";
 export type { TIfinfomsg, TIfinfoPayload } from "./ifinfo.ts";
 export type { TRtattr, TAttributeCodec } from "./rtattr.ts";

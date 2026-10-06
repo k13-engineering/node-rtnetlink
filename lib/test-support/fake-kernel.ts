@@ -101,7 +101,7 @@ const createFakeKernel = ({ links: initialLinks }: { links: TFakeLink[] }) => {
   };
 
   // only the kinds this fake knows can be created
-  const creatableKinds = ["dummy", "bridge"];
+  const creatableKinds = ["dummy", "bridge", "macvlan", "macvtap"];
 
   const isCreatable = ({ attributes }: TRequest) => {
     return creatableKinds.includes(attributes.linkinfo?.kind ?? "");

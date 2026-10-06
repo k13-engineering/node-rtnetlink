@@ -14,6 +14,16 @@ try {
 
   await dummy.modify({ name: "nrt-dummy0", masterIndex: bridge.ifindex, flags: { IFF_UP: true } });
 
+  const lower = await link.createLink({ name: "nrt-lower0", linkinfo: { kind: "dummy" } });
+  const macvtap = await link.createLink({
+    name: "nrt-macvtap0",
+    linkIndex: lower.ifindex,
+    linkinfo: { kind: "macvtap", data: { mode: "bridge" } },
+  });
+  const macvtapInfo = await macvtap.fetch();
+  await macvtap.deleteLink();
+  await lower.deleteLink();
+
   const dummyInfo = await dummy.fetch();
   const bridges = await link.findAllBy({ linkinfo: { kind: "bridge" } });
   const duplicate = await link.createLink({ name: "nrt-br0", linkinfo: { kind: "bridge" } }).then(() => {
@@ -41,6 +51,11 @@ try {
       return ifindex;
     }),
     duplicate,
+    macvtap: {
+      lowerIndex: lower.ifindex,
+      linkIndex: macvtapInfo.linkIndex,
+      linkinfo: macvtapInfo.linkinfo,
+    },
     remaining: remaining.map(({ name }) => {
       return name;
     }),
