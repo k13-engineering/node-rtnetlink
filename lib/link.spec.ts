@@ -1,6 +1,11 @@
 import assert from "node:assert";
 import { describe, it } from "mocha";
-import { NLM_F_CREATE, NLM_F_EXCL } from "node-netlink";
+import {
+  NLM_F_CREATE,
+  NLM_F_DUMP,
+  NLM_F_ECHO,
+  NLM_F_EXCL
+} from "node-netlink";
 import {
   IFF_LOOPBACK,
   IFF_PROMISC,
@@ -200,16 +205,17 @@ describe("link", () => {
   });
 
   describe("createLink", () => {
-    it("should create the link with the next free index", async () => {
+    it("should create a named link with the index the kernel echoes", async () => {
       const { kernel, link } = createTestSetup();
 
       const created = await link.createLink({ name: "br0", linkinfo: { kind: "bridge" }, flags: { IFF_UP: true } });
 
       assert.strictEqual(created.ifindex, 3);
+      assert.strictEqual(kernel.requests().length, 1);
 
       const { header, ifi } = lastRequest({ kernel });
-      assert.strictEqual(header.nlmsg_flags, NLM_F_CREATE | NLM_F_EXCL);
-      assert.strictEqual(ifi.ifi_index, 3n);
+      assert.strictEqual(header.nlmsg_flags, NLM_F_CREATE | NLM_F_EXCL | NLM_F_ECHO);
+      assert.strictEqual(ifi.ifi_index, 0n);
 
       const info = await created.fetch();
       assert.strictEqual(info.name, "br0");
@@ -247,6 +253,8 @@ describe("link", () => {
             raced = true;
             kernel.addLink({ link: { ifindex: 3, type: 1, flags: 0n, name: "other" } });
           }
+
+          return undefined;
         },
       });
 
@@ -255,10 +263,61 @@ describe("link", () => {
       assert.strictEqual(created.ifindex, 4);
     });
 
-    it("should give up after repeated EEXIST, e.g. if the name is taken", async () => {
+    it("should look up named links by name on kernels without echo", async () => {
+      const kernel = createFakeKernel({ links: [loopback, ethernet], echo: false });
+      const { link } = createRtnetlink({ netlink: kernel.netlink });
+
+      const created = await link.createLink({ name: "dummy0", linkinfo: { kind: "dummy" } });
+
+      assert.strictEqual(created.ifindex, 3);
+      assert.strictEqual(lastRequest({ kernel }).header.nlmsg_flags, NLM_F_DUMP);
+    });
+
+    it("should reject if the name is taken, without retrying", async () => {
       const { kernel, link } = createTestSetup();
 
       await assert.rejects(link.createLink({ name: "eth0", linkinfo: { kind: "dummy" } }), /creating link failed with EEXIST/);
+      assert.strictEqual(kernel.requests().length, 1);
+    });
+
+    it("should create an unnamed link with the next free index", async () => {
+      const { kernel, link } = createTestSetup();
+
+      const created = await link.createLink({ linkinfo: { kind: "dummy" } });
+
+      assert.strictEqual(created.ifindex, 3);
+
+      const { header, ifi } = lastRequest({ kernel });
+      assert.strictEqual(header.nlmsg_flags, NLM_F_CREATE | NLM_F_EXCL);
+      assert.strictEqual(ifi.ifi_index, 3n);
+    });
+
+    it("should retry if a link created along with the new one took the index", async () => {
+      const { kernel, link } = createTestSetup();
+
+      let conflicts = 1;
+      kernel.onBeforeCreate({
+        callback: () => {
+          conflicts -= 1;
+          return conflicts >= 0 ? 16 : undefined;
+        },
+      });
+
+      const created = await link.createLink({ linkinfo: { kind: "dummy" } });
+
+      assert.strictEqual(created.ifindex, 3);
+    });
+
+    it("should give up after repeated index conflicts", async () => {
+      const { kernel, link } = createTestSetup();
+
+      kernel.onBeforeCreate({
+        callback: () => {
+          return 17;
+        },
+      });
+
+      await assert.rejects(link.createLink({ linkinfo: { kind: "dummy" } }), /creating link failed with EEXIST/);
 
       const creations = kernel.requests().filter((request) => {
         return request.header.nlmsg_type === RTM_NEWLINK;

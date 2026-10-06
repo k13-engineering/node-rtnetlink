@@ -1,5 +1,11 @@
 import { isDeepStrictEqual } from "node:util";
-import { createErrorFromErrno, NLM_F_CREATE, NLM_F_DUMP, NLM_F_EXCL } from "node-netlink";
+import {
+  createErrorFromErrno,
+  NLM_F_CREATE,
+  NLM_F_DUMP,
+  NLM_F_ECHO,
+  NLM_F_EXCL
+} from "node-netlink";
 import {
   AF_PACKET,
   AF_UNSPEC,
@@ -24,6 +30,7 @@ import { u32Codec, type TRtattr } from "./rtattr.ts";
 import type { TLinkMessage, TLinkRequest, TLinkTryTalkResult } from "./rtnetlink.ts";
 import type { TRtnetlinkStructures } from "./structures.ts";
 
+const EBUSY = 16;
 const EEXIST = 17;
 
 const MAX_CREATE_ATTEMPTS = 3;
@@ -234,6 +241,10 @@ const createLinkApi = ({ rt, structures }: { rt: TLinkRt, structures: TRtnetlink
     return errno;
   };
 
+  const isIndexConflict = ({ errno }: { errno: number }) => {
+    return errno === EEXIST || errno === EBUSY;
+  };
+
   const createWithRetries = async ({ attemptsLeft, flags, attributes }: {
     attemptsLeft: number,
     flags: TLinkFlags,
@@ -246,21 +257,49 @@ const createLinkApi = ({ rt, structures }: { rt: TLinkRt, structures: TRtnetlink
       return fromIndex({ ifindex });
     }
 
-    // EEXIST also means that the name is taken, so retries are limited
-    if (errno !== EEXIST || attemptsLeft <= 1) {
+    // EBUSY: a link created together with the new one, like the peer of a veth link, took the index
+    if (!isIndexConflict({ errno }) || attemptsLeft <= 1) {
       throw createErrorFromErrno({ operation: "creating link", errno });
     }
 
     return createWithRetries({ attemptsLeft: attemptsLeft - 1, flags, attributes });
   };
 
+  // the kernel picks the index, kernels since 6.3 echo the new link, older ones are asked for it by its name
+  const createNamedLink = async ({ name, flags, attributes }: {
+    name: string,
+    flags: TLinkFlags,
+    attributes: TLinkAttributes,
+  }): Promise<TLink> => {
+    const { errno, messages } = await rt.tryTalk({
+      header: { nlmsg_type: RTM_NEWLINK, nlmsg_flags: NLM_F_CREATE | NLM_F_EXCL | NLM_F_ECHO },
+      ifi: { ifi_family: AF_UNSPEC, ...formatLinkFlags({ flags }) },
+      rta: formatLinkAttributes({ attributes: { ...attributes, name }, structures }),
+    });
+
+    if (errno !== undefined) {
+      throw createErrorFromErrno({ operation: "creating link", errno });
+    }
+
+    const echoed = messages.find((message) => {
+      return message.header.nlmsg_type === RTM_NEWLINK;
+    });
+
+    return echoed === undefined ? findOneBy({ name }) : fromIndex({ ifindex: Number(echoed.ifi.ifi_index) });
+  };
+
   /**
-   * Creates a link, e.g. `{ linkinfo: { kind: "bridge" } }`.
+   * Creates a link, e.g. `{ name: "br0", linkinfo: { kind: "bridge" } }`.
    *
-   * The kernel does not report the index of a new link, so the next free index is requested
-   * explicitly. If another link took it in the meantime, creation is retried.
+   * With a name, the kernel picks the index and the link is identified by the echo of the kernel or its name.
+   * Without a name, the next free index is requested explicitly, as nothing else identifies the link on kernels
+   * before 6.3, and creation is retried if another link took it in the meantime.
    */
-  const createLink = async ({ flags = {}, ...attributes }: TLinkAttributes & { flags?: TLinkFlags }) => {
+  const createLink = async ({ flags = {}, name, ...attributes }: TLinkAttributes & { flags?: TLinkFlags }) => {
+    if (name !== undefined) {
+      return createNamedLink({ name, flags, attributes });
+    }
+
     return createWithRetries({ attemptsLeft: MAX_CREATE_ATTEMPTS, flags, attributes });
   };
 

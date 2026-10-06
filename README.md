@@ -199,7 +199,7 @@ Returns `{ link, address, talk, tryTalk }`.
 
 The criteria are link attributes, `type` and `flags`. A link matches if all given values are equal. For `linkinfo`, only the given fields are compared, and for `flags`, only the given flags. The links are filtered after dumping all of them, as the kernel can only look up single links by name or index.
 
-The kernel does not report the index of a link it created. `createLink()` therefore requests the next free index explicitly and retries up to 3 times if the kernel reports `EEXIST`, e.g. because another process created a link at the same time. If the name is taken, it rejects with `EEXIST` after the retries.
+`createLink()` needs to know the index of the new link. With a `name`, the kernel picks the index: kernels since 6.3 report the new link back (`NLM_F_ECHO`), older ones are asked for the link with that name afterwards. If the name is taken, it rejects with `EEXIST`. Without a `name`, nothing identifies the link on older kernels, so `createLink()` requests the next free index explicitly and retries up to 3 times if the kernel reports `EEXIST` or `EBUSY`, e.g. because another process created a link at the same time, or because a link created along with the new one, like the peer of a veth link, took the index. Give links a name where possible.
 
 A link (`TLink`) has:
 

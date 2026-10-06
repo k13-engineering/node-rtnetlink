@@ -2,6 +2,7 @@ import {
   createErrorFromErrno,
   NLM_F_CREATE,
   NLM_F_DUMP,
+  NLM_F_ECHO,
   NLM_F_EXCL,
   NLM_F_MULTI,
   type TNetlinkMessage,
@@ -75,12 +76,16 @@ const fail = ({ errno }: { errno: number }): TResult => {
 /**
  * A fake rtnetlink kernel with an in-memory list of links, answering requests like the kernel does.
  */
+// echo: whether NLM_F_ECHO is honoured for new links, like kernels since 6.3 do
 // eslint-disable-next-line max-statements
-const createFakeKernel = ({ links: initialLinks }: { links: TFakeLink[] }) => {
+const createFakeKernel = ({ links: initialLinks, echo = true }: { links: TFakeLink[], echo?: boolean }) => {
   let links = initialLinks;
   let requests: TTalkArgs[] = [];
   let injectedResults: TResult[] = [];
-  let beforeCreate = () => {};
+  // may return an errno to fail the creation with
+  let beforeCreate: () => number | undefined = () => {
+    return undefined;
+  };
   const fakeAddresses = createFakeAddresses({
     hasLink: ({ ifindex }) => {
       return links.some((link) => {
@@ -149,19 +154,34 @@ const createFakeKernel = ({ links: initialLinks }: { links: TFakeLink[] }) => {
     return isCreatable(request) ? undefined : EOPNOTSUPP;
   };
 
-  const createLink = (request: TRequest) => {
-    beforeCreate();
+  // like the kernel, the next free index if none is requested
+  const indexFor = ({ ifi }: TRequest) => {
+    if (ifi.ifi_index !== 0n) {
+      return Number(ifi.ifi_index);
+    }
 
-    const errno = creationErrno(request);
+    return links.reduce((highest, link) => {
+      return Math.max(highest, link.ifindex);
+    }, 0) + 1;
+  };
+
+  const echoOf = ({ request, link }: { request: TRequest, link: TFakeLink }) => {
+    return echo && (request.flags & NLM_F_ECHO) !== 0n ? [messageOf({ link })] : [];
+  };
+
+  const createLink = (request: TRequest) => {
+    const errno = beforeCreate() ?? creationErrno(request);
     if (errno !== undefined) {
       return fail({ errno });
     }
 
     const { ifi, attributes } = request;
-    const created = { ifindex: Number(ifi.ifi_index), type: 1, name: `link${ifi.ifi_index}`, ...attributes, flags: 0n };
-    links = [...links, { ...created, flags: applyFlags({ link: created, ifi }) }];
+    const ifindex = indexFor(request);
+    const created = { ifindex, type: 1, name: `link${ifindex}`, ...attributes, flags: 0n };
+    const link = { ...created, flags: applyFlags({ link: created, ifi }) };
+    links = [...links, link];
 
-    return ok();
+    return ok({ messages: echoOf({ request, link }) });
   };
 
   const changeLink = ({ ifi, attributes }: TRequest) => {
@@ -300,7 +320,7 @@ const createFakeKernel = ({ links: initialLinks }: { links: TFakeLink[] }) => {
       injectedResults = [...injectedResults, result];
     },
     // called before each link creation, e.g. to simulate a concurrent creation
-    onBeforeCreate: ({ callback }: { callback: () => void }) => {
+    onBeforeCreate: ({ callback }: { callback: () => number | undefined }) => {
       beforeCreate = callback;
     },
     addLink: ({ link }: { link: TFakeLink }) => {
