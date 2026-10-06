@@ -243,6 +243,7 @@ const messages = await rt.talk({
 | `formatAttributes({ attributes, structures })`, `parseAttributes({ data, structures })` | lists of `rtattr` |
 | `formatLinkAttributes({ attributes, structures })`, `parseLinkAttributes({ rta, structures })` | link attributes from and to `rtattr`s |
 | `formatLinkFlags({ flags })`, `parseLinkFlags({ ifi_flags })` | link flags from and to `ifi_flags` and `ifi_change` |
+| `parseIpAddress({ address })`, `formatIpAddress({ bytes })` | IPv4 and IPv6 addresses from and to their bytes in network byte order, formatted as recommended by RFC 5952 |
 | `typeOfAttribute({ attribute })` | the type of an `rtattr` without `NLA_F_NESTED` and `NLA_F_NET_BYTEORDER` |
 | `stringCodec`, `u32Codec`, `bytesCodec` | codecs of attribute values |
 

@@ -1,5 +1,6 @@
 import { createRtnetlink, isLinkMessageType, parseLinkMessage } from "./rtnetlink.ts";
 import { formatIfinfoPayload, parseIfinfoPayload } from "./ifinfo.ts";
+import { formatIpAddress, parseIpAddress } from "./ip-address.ts";
 import {
   formatLinkAttributes,
   linkAttributeNames,
@@ -31,6 +32,9 @@ export {
 
   formatIfinfoPayload,
   parseIfinfoPayload,
+
+  parseIpAddress,
+  formatIpAddress,
 
   formatLinkAttributes,
   parseLinkAttributes,
@@ -75,5 +79,6 @@ export type {
 } from "./linkinfo.ts";
 export type { TLinkFlagName, TLinkFlags } from "./link-flags.ts";
 export type { TIfinfomsg, TIfinfoPayload } from "./ifinfo.ts";
+export type { TAddressFamily, TIpAddress } from "./ip-address.ts";
 export type { TRtattr, TAttributeCodec } from "./rtattr.ts";
 export type { TRtnetlinkStructures } from "./structures.ts";
