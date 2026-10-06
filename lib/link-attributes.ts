@@ -4,6 +4,7 @@ import {
   IFLA_IFNAME,
   IFLA_INFO_KIND,
   IFLA_INFO_SLAVE_KIND,
+  IFLA_LINK,
   IFLA_LINKINFO,
   IFLA_MASTER,
   IFLA_MTU,
@@ -36,6 +37,8 @@ type TLinkAttributes = {
   txqlen?: number;
   // ifindex of the master link, e.g. a bridge, 0 to detach from it
   masterIndex?: number;
+  // ifindex of the lower link of a virtual link, e.g. the parent of a macvlan or vlan link
+  linkIndex?: number;
   linkinfo?: TLinkinfo;
 };
 
@@ -83,6 +86,7 @@ const linkAttributeDefinitions: TLinkAttributeDefinitions = {
   broadcast: { rta_type: IFLA_BROADCAST, codec: bytesCodec },
   txqlen: { rta_type: IFLA_TXQLEN, codec: u32Codec },
   masterIndex: { rta_type: IFLA_MASTER, codec: u32Codec },
+  linkIndex: { rta_type: IFLA_LINK, codec: u32Codec },
   linkinfo: { rta_type: IFLA_LINKINFO, codec: linkinfoCodec },
 };
 

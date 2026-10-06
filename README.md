@@ -179,6 +179,7 @@ A link (`TLink`) has:
 | `broadcast` | `IFLA_BROADCAST` | `Uint8Array` |
 | `txqlen` | `IFLA_TXQLEN` | `number` |
 | `masterIndex` | `IFLA_MASTER` | `number`, 0 removes the link from its master |
+| `linkIndex` | `IFLA_LINK` | `number`, the lower link of a virtual link, e.g. the parent of a macvlan link |
 | `linkinfo` | `IFLA_LINKINFO` | `{ kind?: string, slaveKind?: string }` |
 
 ### Link flags

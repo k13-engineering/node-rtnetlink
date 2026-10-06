@@ -29,6 +29,7 @@ const allAttributes: Required<TLinkAttributes> = {
   broadcast: Uint8Array.from([0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF]),
   txqlen: 1000,
   masterIndex: 3,
+  linkIndex: 2,
   linkinfo: { kind: "bridge", slaveKind: "bond" },
 };
 
