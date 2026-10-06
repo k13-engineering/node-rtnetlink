@@ -172,7 +172,7 @@ const netlink = createNetlinkSocket({
 });
 ```
 
-See [examples/](examples/) for complete programs that list links, create a bridge and monitor link changes.
+See [examples/](examples/) for complete programs that list links, create a bridge, a veth pair and a macvtap link, and monitor link changes.
 
 ## API
 
