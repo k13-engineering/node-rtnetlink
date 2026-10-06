@@ -1,15 +1,21 @@
 import {
+  IFLA_ADDRESS,
+  IFLA_IFNAME,
   IFLA_INFO_DATA,
   IFLA_INFO_KIND,
   IFLA_INFO_SLAVE_KIND,
   IFLA_MACVLAN_MODE,
+  IFLA_MTU,
   MACVLAN_MODE_BRIDGE,
   MACVLAN_MODE_PASSTHRU,
   MACVLAN_MODE_PRIVATE,
   MACVLAN_MODE_SOURCE,
-  MACVLAN_MODE_VEPA
+  MACVLAN_MODE_VEPA,
+  VETH_INFO_PEER
 } from "./constants.ts";
+import { formatIfinfoPayload, parseIfinfoPayload } from "./ifinfo.ts";
 import {
+  bytesCodec,
   formatAttributes,
   parseAttributes,
   stringCodec,
@@ -28,15 +34,29 @@ type TMacvlanData = {
   mode?: TMacvlanMode;
 };
 
-// the kind specific attributes, decoded for the kinds in linkinfoDataCodecs
-type TLinkinfoData = TMacvlanData;
+// the other end of a veth link, which the kernel creates together with it
+type TVethPeer = {
+  // the kernel picks a name like veth0 if omitted
+  name?: string;
+  mtu?: number;
+  address?: Uint8Array;
+};
+
+// IFLA_INFO_DATA of veth links
+type TVethData = {
+  peer?: TVethPeer;
+};
+
+// the kind specific attributes, decoded for the kinds in linkinfoDataCodecs; all fields are optional,
+// so the fields of the different kinds are combined, which lets users read them without narrowing
+type TLinkinfoData = TMacvlanData & TVethData;
 
 type TLinkinfo = {
   // the type of the link, e.g. "bridge", "veth", "dummy" or "macvtap"
   kind?: string;
   // the type of the master this link is a port of, e.g. "bridge"
   slaveKind?: string;
-  // kind specific attributes, supported for macvlan and macvtap
+  // kind specific attributes, supported for macvlan, macvtap and veth
   data?: TLinkinfoData;
 };
 
@@ -86,9 +106,65 @@ const macvlanDataCodec: TAttributeCodec<TMacvlanData> = {
   },
 };
 
+const vethPeerAttributeCodecs = {
+  name: { rta_type: IFLA_IFNAME, codec: stringCodec },
+  mtu: { rta_type: IFLA_MTU, codec: u32Codec },
+  address: { rta_type: IFLA_ADDRESS, codec: bytesCodec },
+};
+
+type TVethPeerAttributeName = keyof typeof vethPeerAttributeCodecs;
+
+const vethPeerAttributeNames = Object.keys(vethPeerAttributeCodecs) as TVethPeerAttributeName[];
+
+// the codec of a peer attribute, without the relation between attribute name and value type
+const vethPeerCodecOf = ({ name }: { name: TVethPeerAttributeName }) => {
+  return vethPeerAttributeCodecs[name] as { rta_type: bigint, codec: TAttributeCodec<unknown> };
+};
+
+// VETH_INFO_PEER holds a struct ifinfomsg and the attributes of the peer, like RTM_NEWLINK
+const formatVethPeer = ({ peer, structures }: { peer: TVethPeer, structures: TRtnetlinkStructures }): TRtattr => {
+  const rta = vethPeerAttributeNames.filter((name) => {
+    return peer[name] !== undefined;
+  }).map((name) => {
+    const { rta_type, codec } = vethPeerCodecOf({ name });
+    return { rta_type, data: codec.format({ value: peer[name], structures }) };
+  });
+
+  return { rta_type: VETH_INFO_PEER, data: formatIfinfoPayload({ ifi: {}, rta, structures }) };
+};
+
+const parseVethPeer = ({ attribute, structures }: { attribute: TRtattr, structures: TRtnetlinkStructures }): TVethPeer => {
+  const { rta } = parseIfinfoPayload({ payload: attribute.data, structures });
+
+  return vethPeerAttributeNames.reduce((peer: TVethPeer, name) => {
+    const { rta_type, codec } = vethPeerCodecOf({ name });
+    const found = rta.find((candidate) => {
+      return typeOfAttribute({ attribute: candidate }) === rta_type;
+    });
+
+    return found === undefined ? peer : { ...peer, [name]: codec.parse({ data: found.data, structures }) };
+  }, {});
+};
+
+const vethDataCodec: TAttributeCodec<TVethData> = {
+  format: ({ value, structures }) => {
+    const attributes = value.peer === undefined ? [] : [formatVethPeer({ peer: value.peer, structures })];
+    return formatAttributes({ attributes, structures });
+  },
+  parse: ({ data, structures }) => {
+    const peerAttribute = parseAttributes({ data, structures }).find((attribute) => {
+      return typeOfAttribute({ attribute }) === VETH_INFO_PEER;
+    });
+
+    return peerAttribute === undefined ? {} : { peer: parseVethPeer({ attribute: peerAttribute, structures }) };
+  },
+};
+
+// each codec handles the data of its kinds
 const linkinfoDataCodecs: Record<string, TAttributeCodec<TLinkinfoData>> = {
-  macvlan: macvlanDataCodec,
-  macvtap: macvlanDataCodec,
+  macvlan: macvlanDataCodec as TAttributeCodec<TLinkinfoData>,
+  macvtap: macvlanDataCodec as TAttributeCodec<TLinkinfoData>,
+  veth: vethDataCodec as TAttributeCodec<TLinkinfoData>,
 };
 
 const dataCodecFor = ({ kind }: { kind: string | undefined }) => {
@@ -171,4 +247,6 @@ export type {
   TLinkinfoData,
   TMacvlanData,
   TMacvlanMode,
+  TVethData,
+  TVethPeer,
 };

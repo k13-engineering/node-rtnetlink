@@ -94,6 +94,8 @@ export type {
   TLinkinfoData,
   TMacvlanData,
   TMacvlanMode,
+  TVethData,
+  TVethPeer,
 } from "./linkinfo.ts";
 export type { TLinkFlagName, TLinkFlags } from "./link-flags.ts";
 export type { TIfinfomsg, TIfinfoPayload } from "./ifinfo.ts";

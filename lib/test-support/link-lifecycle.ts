@@ -14,6 +14,12 @@ try {
 
   await dummy.modify({ name: "nrt-dummy0", masterIndex: bridge.ifindex, flags: { IFF_UP: true } });
 
+  // a veth pair, the peer refers to the link with IFLA_LINK, deleting one end deletes both
+  const veth = await link.createLink({ name: "nrt-veth0", linkinfo: { kind: "veth", data: { peer: { name: "nrt-veth1", mtu: 1400 } } } });
+  const vethPeer = await (await link.findOneBy({ name: "nrt-veth1" })).fetch();
+  await veth.deleteLink();
+  const vethPeerAfterDelete = await link.tryFindOneBy({ name: "nrt-veth1" });
+
   const lower = await link.createLink({ name: "nrt-lower0", linkinfo: { kind: "dummy" } });
   const macvtap = await link.createLink({
     name: "nrt-macvtap0",
@@ -105,6 +111,11 @@ try {
       return ifindex;
     }),
     duplicate,
+    veth: {
+      ifindex: veth.ifindex,
+      peer: { linkIndex: vethPeer.linkIndex, mtu: vethPeer.mtu, kind: vethPeer.linkinfo?.kind },
+      peerRemoved: vethPeerAfterDelete === undefined,
+    },
     namespaces: {
       outerNames,
       innerNames,

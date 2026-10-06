@@ -80,7 +80,7 @@ describe("link attributes", () => {
   it("should parse nested linkinfo with NLA_F_NESTED and ignore unknown nested attributes", () => {
     const data = formatAttributes({
       attributes: [
-        { rta_type: IFLA_INFO_KIND, data: stringCodec.format({ value: "veth", structures }) },
+        { rta_type: IFLA_INFO_KIND, data: stringCodec.format({ value: "vxlan", structures }) },
         { rta_type: IFLA_INFO_DATA | NLA_F_NESTED, data: new Uint8Array(0) },
         { rta_type: IFLA_INFO_SLAVE_KIND, data: stringCodec.format({ value: "bridge", structures }) },
       ],
@@ -89,7 +89,7 @@ describe("link attributes", () => {
 
     const { attributes } = parseLinkAttributes({ rta: [{ rta_type: IFLA_LINKINFO | NLA_F_NESTED, data }], structures });
 
-    assert.deepStrictEqual(attributes, { linkinfo: { kind: "veth", slaveKind: "bridge" } });
+    assert.deepStrictEqual(attributes, { linkinfo: { kind: "vxlan", slaveKind: "bridge" } });
   });
 
   it("should return attributes without definition as unknown", () => {

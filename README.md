@@ -226,9 +226,17 @@ A link (`TLink`) has:
 | `linkIndex` | `IFLA_LINK` | `number`, the lower link of a virtual link, e.g. the parent of a macvlan link |
 | `linkinfo` | `IFLA_LINKINFO` | `{ kind?: string, slaveKind?: string, data?: TLinkinfoData }` |
 
-`linkinfo.data` holds the kind specific attributes of `IFLA_INFO_DATA`. They are supported for `macvlan` and `macvtap` links, as `{ mode?: "private" | "vepa" | "bridge" | "passthru" | "source" }`, the kernel uses `"vepa"` if the mode is omitted. For other kinds, `data` is left out when parsing, and setting it throws.
+`linkinfo.data` holds the kind specific attributes of `IFLA_INFO_DATA`. For other kinds than the ones below, `data` is left out when parsing, and setting it throws.
+
+| Kind | `data` |
+| --- | --- |
+| `macvlan`, `macvtap` | `{ mode?: "private" \| "vepa" \| "bridge" \| "passthru" \| "source" }`, the kernel uses `"vepa"` if the mode is omitted |
+| `veth` | `{ peer?: { name?: string, mtu?: number, address?: Uint8Array } }`, the other end, which the kernel creates together with the link and names like `veth0` if no name is given. The kernel does not report the peer of existing links |
 
 ```ts
+// a veth pair, like ip link add veth0 type veth peer name veth1
+const veth0 = await rt.link.createLink({ name: "veth0", linkinfo: { kind: "veth", data: { peer: { name: "veth1" } } } });
+
 const eth0 = await rt.link.findOneBy({ name: "eth0" });
 const macvtap = await rt.link.createLink({
   name: "macvtap0",

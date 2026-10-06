@@ -235,6 +235,15 @@ describe("link", () => {
       assert.deepStrictEqual(await link.findAllBy({ linkinfo: { data: { mode: "vepa" } } }), []);
     });
 
+    it("should create veth links with a named peer", async () => {
+      const { kernel, link } = createTestSetup();
+
+      const created = await link.createLink({ name: "veth0", linkinfo: { kind: "veth", data: { peer: { name: "veth1" } } } });
+
+      assert.strictEqual(created.ifindex, 3);
+      assert.deepStrictEqual(kernel.links().at(-1)?.linkinfo, { kind: "veth", data: { peer: { name: "veth1" } } });
+    });
+
     it("should create links without flags", async () => {
       const { link } = createTestSetup();
 

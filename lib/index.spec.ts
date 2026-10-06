@@ -117,6 +117,11 @@ describe("node-rtnetlink on the host kernel", () => {
       linkIndex: result.macvtap.lowerIndex,
       linkinfo: { kind: "macvtap", data: { mode: "bridge" } },
     });
+    assert.deepStrictEqual(result.veth, {
+      ifindex: result.veth.ifindex,
+      peer: { linkIndex: result.veth.ifindex, mtu: 1400, kind: "veth" },
+      peerRemoved: true,
+    });
     assertNamespaces({ namespaces: result.namespaces });
     assert.deepStrictEqual(result.remaining, ["lo"]);
   });

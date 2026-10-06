@@ -1,4 +1,5 @@
-// values from <sys/socket.h>, <linux/rtnetlink.h>, <linux/if_link.h>, <linux/if_addr.h>, <linux/if.h> and <linux/netlink.h>
+// values from <sys/socket.h>, <linux/rtnetlink.h>, <linux/if_link.h>, <linux/if_addr.h>, <linux/veth.h>, <linux/if.h>
+// and <linux/netlink.h>
 
 // address families, used as ifi_family
 const AF_UNSPEC = 0n;
@@ -53,6 +54,10 @@ const IFLA_INFO_SLAVE_DATA = 5n;
 const IFLA_MACVLAN_UNSPEC = 0n;
 const IFLA_MACVLAN_MODE = 1n;
 const IFLA_MACVLAN_FLAGS = 2n;
+
+// nested attributes of IFLA_INFO_DATA for veth links, VETH_INFO_PEER holds a struct ifinfomsg and attributes
+const VETH_INFO_UNSPEC = 0n;
+const VETH_INFO_PEER = 1n;
 
 // values of IFLA_MACVLAN_MODE
 const MACVLAN_MODE_PRIVATE = 1n;
@@ -169,6 +174,9 @@ export {
   IFLA_MACVLAN_UNSPEC,
   IFLA_MACVLAN_MODE,
   IFLA_MACVLAN_FLAGS,
+
+  VETH_INFO_UNSPEC,
+  VETH_INFO_PEER,
 
   MACVLAN_MODE_PRIVATE,
   MACVLAN_MODE_VEPA,
