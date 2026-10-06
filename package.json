@@ -25,7 +25,7 @@
   },
   "dependencies": {
     "node-netlink": "^0.0.5",
-    "po6": "^0.1.0",
+    "po6": "^0.1.2",
     "ya-struct": "^0.0.17"
   }
 }
