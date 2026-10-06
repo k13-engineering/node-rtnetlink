@@ -7,17 +7,32 @@ import { after, describe, it } from "mocha";
 
 const projectRoot = nodePath.resolve(import.meta.dirname, "..");
 
+const binary = ({ name }: { name: string }) => {
+  return nodePath.join(projectRoot, "node_modules", ".bin", name);
+};
+
 const buildPackage = ({ outDirectory }: { outDirectory: string }) => {
-  nodeChildProcess.execFileSync(nodePath.join(projectRoot, "node_modules", ".bin", "deno-node-build"), [
+  nodeChildProcess.execFileSync(binary({ name: "deno-node-build" }), [
     "--root", projectRoot,
     "--out", `${outDirectory}/`,
     "--entry", "lib/index.ts",
   ], { stdio: "pipe" });
 };
 
-// The published package is the output of deno-node-build, which generates the declaration files
-// per file. Types it cannot infer without the other files end up as any or unknown, which silently
-// removes the type checks for users, so the public API declares its types explicitly.
+const emitDeclarationsWithTypeScript = ({ outDirectory }: { outDirectory: string }) => {
+  nodeChildProcess.execFileSync(binary({ name: "tsc" }), [
+    "--project", nodePath.join(projectRoot, "tsconfig.json"),
+    "--declaration",
+    "--emitDeclarationOnly",
+    "--noEmit", "false",
+    "--outDir", outDirectory,
+  ], { stdio: "pipe" });
+};
+
+// The published package is the output of deno-node-build, which generates the declaration files per
+// file. Types it cannot infer without the other files end up as any, unknown or even narrower types
+// than the real ones, which silently breaks the type checks of users. The declarations must therefore
+// be the ones the TypeScript compiler generates for the whole project.
 describe("built package", () => {
   const outDirectory = nodeFs.mkdtempSync(nodePath.join(nodeOs.tmpdir(), "rtnetlink-build-"));
 
@@ -25,24 +40,26 @@ describe("built package", () => {
     nodeFs.rmSync(outDirectory, { recursive: true, force: true });
   });
 
-  it("should declare the public API without any or unknown results", () => {
-    buildPackage({ outDirectory });
+  it("should declare the same types as the TypeScript compiler", () => {
+    const packageDirectory = nodePath.join(outDirectory, "package");
+    const typescriptDirectory = nodePath.join(outDirectory, "typescript");
 
-    const declarationFiles = nodeFs.readdirSync(nodePath.join(outDirectory, "lib")).filter((file) => {
+    buildPackage({ outDirectory: packageDirectory });
+    emitDeclarationsWithTypeScript({ outDirectory: typescriptDirectory });
+
+    const declarationFiles = nodeFs.readdirSync(nodePath.join(packageDirectory, "lib")).filter((file) => {
       return file.endsWith(".d.ts");
     });
 
-    const problems = declarationFiles.flatMap((file) => {
-      const lines = nodeFs.readFileSync(nodePath.join(outDirectory, "lib", file), "utf8").split("\n");
+    const differingFiles = declarationFiles.filter((file) => {
+      // deno-node-build rewrites the imports to the transpiled .js files
+      const published = nodeFs.readFileSync(nodePath.join(packageDirectory, "lib", file), "utf8").replaceAll(".js\"", ".ts\"");
+      const expected = nodeFs.readFileSync(nodePath.join(typescriptDirectory, "lib", file), "utf8");
 
-      return lines.filter((line) => {
-        return /\bany\b/.test(line) || /=>\s*(?:unknown|Promise<unknown>);/.test(line);
-      }).map((line) => {
-        return `${file}: ${line.trim()}`;
-      });
+      return published !== expected;
     });
 
     assert.ok(declarationFiles.length > 1);
-    assert.deepStrictEqual(problems, []);
-  }).timeout(60_000);
+    assert.deepStrictEqual(differingFiles, []);
+  }).timeout(120_000);
 });
