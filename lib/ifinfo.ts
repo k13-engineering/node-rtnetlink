@@ -30,7 +30,7 @@ const formatIfinfoPayload = ({ ifi, rta = [], structures }: {
   ifi: Partial<TIfinfomsg>,
   rta?: TRtattr[],
   structures: TRtnetlinkStructures,
-}) => {
+}): Uint8Array => {
   const header = structures.ifinfomsg.format({ value: { ...emptyIfinfomsg, ...ifi } });
   const attributes = formatAttributes({ attributes: rta, structures });
   const attributesOffset = rtaAlign({ length: header.length });

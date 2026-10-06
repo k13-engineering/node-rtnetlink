@@ -50,6 +50,15 @@ type TLinkCriteria = TLinkAttributes & {
   flags?: TLinkFlags;
 };
 
+type TLinkApi = {
+  fromIndex: (args: { ifindex: number }) => TLink;
+  listAll: () => Promise<TLinkInfo[]>;
+  findAllBy: (criteria: TLinkCriteria) => Promise<TLink[]>;
+  tryFindOneBy: (criteria: TLinkCriteria) => Promise<TLink | undefined>;
+  findOneBy: (criteria: TLinkCriteria) => Promise<TLink>;
+  createLink: (args: TLinkAttributes & { flags?: TLinkFlags }) => Promise<TLink>;
+};
+
 type TLinkRt = {
   talk: (request: TLinkRequest) => Promise<TLinkMessage[]>;
   tryTalk: (request: TLinkRequest) => Promise<TLinkTryTalkResult>;
@@ -92,7 +101,8 @@ const linkMatches = ({ info, criteria }: { info: TLinkInfo, criteria: TLinkCrite
   });
 };
 
-const createLinkApi = ({ rt, structures }: { rt: TLinkRt, structures: TRtnetlinkStructures }) => {
+// spelled out, as the declaration files are generated per file and could not infer the types of async functions
+const createLinkApi = ({ rt, structures }: { rt: TLinkRt, structures: TRtnetlinkStructures }): TLinkApi => {
 
   const fromIndex = ({ ifindex }: { ifindex: number }): TLink => {
     const fetch = async () => {
@@ -236,8 +246,6 @@ const createLinkApi = ({ rt, structures }: { rt: TLinkRt, structures: TRtnetlink
     createLink,
   };
 };
-
-type TLinkApi = ReturnType<typeof createLinkApi>;
 
 export {
   createLinkApi,

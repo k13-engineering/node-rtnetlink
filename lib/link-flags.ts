@@ -20,7 +20,13 @@ import {
   IFF_UP
 } from "./constants.ts";
 
-const linkFlagValues = {
+// spelled out, as the declaration files are generated per file and could not infer the types of the imported values
+type TLinkFlagName =
+  "IFF_UP" | "IFF_BROADCAST" | "IFF_DEBUG" | "IFF_LOOPBACK" | "IFF_POINTOPOINT" | "IFF_NOTRAILERS" | "IFF_RUNNING" |
+  "IFF_NOARP" | "IFF_PROMISC" | "IFF_ALLMULTI" | "IFF_MASTER" | "IFF_SLAVE" | "IFF_MULTICAST" | "IFF_PORTSEL" |
+  "IFF_AUTOMEDIA" | "IFF_DYNAMIC" | "IFF_LOWER_UP" | "IFF_DORMANT" | "IFF_ECHO";
+
+const linkFlagValues: Record<TLinkFlagName, bigint> = {
   IFF_UP,
   IFF_BROADCAST,
   IFF_DEBUG,
@@ -42,8 +48,6 @@ const linkFlagValues = {
   IFF_ECHO,
 };
 
-type TLinkFlagName = keyof typeof linkFlagValues;
-
 // flags to set (true) or clear (false), flags that are not given are left unchanged
 type TLinkFlags = Partial<Record<TLinkFlagName, boolean>>;
 
@@ -58,7 +62,7 @@ const valueOfFlag = ({ name }: { name: string }) => {
 /**
  * Turns flags into ifi_flags and ifi_change of struct ifinfomsg.
  */
-const formatLinkFlags = ({ flags }: { flags: TLinkFlags }) => {
+const formatLinkFlags = ({ flags }: { flags: TLinkFlags }): { ifi_flags: bigint, ifi_change: bigint } => {
   return Object.entries(flags).reduce(({ ifi_flags, ifi_change }, [name, set]) => {
     const value = valueOfFlag({ name });
 
@@ -72,7 +76,7 @@ const formatLinkFlags = ({ flags }: { flags: TLinkFlags }) => {
 /**
  * Turns ifi_flags of struct ifinfomsg into an object with all known flags.
  */
-const parseLinkFlags = ({ ifi_flags }: { ifi_flags: bigint }) => {
+const parseLinkFlags = ({ ifi_flags }: { ifi_flags: bigint }): Record<TLinkFlagName, boolean> => {
   return Object.fromEntries(Object.entries(linkFlagValues).map(([name, value]) => {
     return [name, (ifi_flags & value) !== 0n];
   })) as Record<TLinkFlagName, boolean>;

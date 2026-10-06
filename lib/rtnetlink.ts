@@ -1,7 +1,7 @@
 import type { TNetlinkHeader, TNetlinkMessage, TNetlinkSocket } from "node-netlink";
 import { RTM_DELLINK, RTM_GETLINK, RTM_NEWLINK, RTM_SETLINK } from "./constants.ts";
 import { formatIfinfoPayload, parseIfinfoPayload, type TIfinfomsg } from "./ifinfo.ts";
-import { createLinkApi } from "./link.ts";
+import { createLinkApi, type TLinkApi } from "./link.ts";
 import type { TRtattr } from "./rtattr.ts";
 import { hostStructures, type TRtnetlinkStructures } from "./structures.ts";
 
@@ -29,9 +29,17 @@ type TLinkTryTalkResult = {
   messages: TLinkMessage[];
 };
 
+type TRtnetlink = {
+  // sends a link request and resolves with the responses, rejects if the kernel reports an error
+  talk: (request: TLinkRequest) => Promise<TLinkMessage[]>;
+  // like talk(), but resolves with the errno reported by the kernel instead of rejecting
+  tryTalk: (request: TLinkRequest) => Promise<TLinkTryTalkResult>;
+  link: TLinkApi;
+};
+
 const linkMessageTypes = [RTM_NEWLINK, RTM_DELLINK, RTM_GETLINK, RTM_SETLINK];
 
-const isLinkMessageType = ({ nlmsg_type }: { nlmsg_type: bigint }) => {
+const isLinkMessageType = ({ nlmsg_type }: { nlmsg_type: bigint }): boolean => {
   return linkMessageTypes.includes(nlmsg_type);
 };
 
@@ -54,7 +62,7 @@ const parseLinkMessage = ({ message, structures = hostStructures }: {
 const createRtnetlink = ({ netlink, structures = hostStructures }: {
   netlink: TRtnetlinkNetlink,
   structures?: TRtnetlinkStructures,
-}) => {
+}): TRtnetlink => {
 
   const toNetlinkRequest = ({ header, ifi, rta, timeoutMs }: TLinkRequest) => {
     if (!isLinkMessageType({ nlmsg_type: header.nlmsg_type })) {
@@ -106,8 +114,6 @@ const createRtnetlink = ({ netlink, structures = hostStructures }: {
     link: createLinkApi({ rt: { talk, tryTalk }, structures }),
   };
 };
-
-type TRtnetlink = ReturnType<typeof createRtnetlink>;
 
 export {
   createRtnetlink,

@@ -14,21 +14,21 @@ type TAttributeCodec<T> = {
 
 const RTA_ALIGNTO = 4;
 
-const rtaAlign = ({ length }: { length: number }) => {
+const rtaAlign = ({ length }: { length: number }): number => {
   return Math.ceil(length / RTA_ALIGNTO) * RTA_ALIGNTO;
 };
 
 /**
  * The type of an attribute without the NLA_F_NESTED and NLA_F_NET_BYTEORDER flags.
  */
-const typeOfAttribute = ({ attribute }: { attribute: TRtattr }) => {
+const typeOfAttribute = ({ attribute }: { attribute: TRtattr }): bigint => {
   return attribute.rta_type & NLA_TYPE_MASK;
 };
 
 /**
  * Formats a list of attributes, each one padded to RTA_ALIGNTO.
  */
-const formatAttributes = ({ attributes, structures }: { attributes: TRtattr[], structures: TRtnetlinkStructures }) => {
+const formatAttributes = ({ attributes, structures }: { attributes: TRtattr[], structures: TRtnetlinkStructures }): Uint8Array => {
   const headerSize = structures.rtattr.size;
 
   const totalLength = attributes.reduce((sum, attribute) => {
@@ -77,7 +77,7 @@ const parseOneAttribute = ({ data, structures }: { data: Uint8Array, structures:
 /**
  * Parses a list of attributes, throws if it is malformed.
  */
-const parseAttributes = ({ data, structures }: { data: Uint8Array, structures: TRtnetlinkStructures }) => {
+const parseAttributes = ({ data, structures }: { data: Uint8Array, structures: TRtnetlinkStructures }): TRtattr[] => {
   let attributes: TRtattr[] = [];
   let remaining = data;
 

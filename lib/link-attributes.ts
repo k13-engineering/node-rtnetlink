@@ -97,7 +97,10 @@ const definitionOf = ({ name }: { name: TLinkAttributeName }) => {
  * Turns link attributes into rtattrs, attributes that are undefined are skipped.
  * Throws for unknown attributes.
  */
-const formatLinkAttributes = ({ attributes, structures }: { attributes: TLinkAttributes, structures: TRtnetlinkStructures }) => {
+const formatLinkAttributes = ({ attributes, structures }: {
+  attributes: TLinkAttributes,
+  structures: TRtnetlinkStructures,
+}): TRtattr[] => {
   return Object.entries(attributes).flatMap(([name, value]) => {
     if (!Object.hasOwn(linkAttributeDefinitions, name)) {
       throw Error(`unknown link attribute "${name}"`);
@@ -123,8 +126,14 @@ const findDefinition = ({ attribute }: { attribute: TRtattr }) => {
 /**
  * Turns rtattrs of a link into link attributes. Attributes without a definition are returned as `unknown`.
  */
-const parseLinkAttributes = ({ rta, structures }: { rta: TRtattr[], structures: TRtnetlinkStructures }) => {
-  return rta.reduce(({ attributes, unknown }: { attributes: TLinkAttributes, unknown: TRtattr[] }, attribute) => {
+type TParsedLinkAttributes = {
+  attributes: TLinkAttributes;
+  // attributes without a definition
+  unknown: TRtattr[];
+};
+
+const parseLinkAttributes = ({ rta, structures }: { rta: TRtattr[], structures: TRtnetlinkStructures }): TParsedLinkAttributes => {
+  return rta.reduce(({ attributes, unknown }: TParsedLinkAttributes, attribute) => {
     const name = findDefinition({ attribute });
 
     if (name === undefined) {
@@ -143,6 +152,7 @@ export {
 };
 
 export type {
+  TParsedLinkAttributes,
   TLinkAttributes,
   TLinkAttributeName,
   TLinkinfo,

@@ -26,18 +26,25 @@ const rtattrDefinition = {
   ],
 } as const;
 
-const ifinfomsg = define({ definition: ifinfomsgDefinition });
-const rtattr = define({ definition: rtattrDefinition });
+// spelled out, as the declaration files are generated per file and could not infer these types
+const ifinfomsg: ReturnType<typeof define<typeof ifinfomsgDefinition>> = define({ definition: ifinfomsgDefinition });
+const rtattr: ReturnType<typeof define<typeof rtattrDefinition>> = define({ definition: rtattrDefinition });
 
-const createRtnetlinkStructuresFor = ({ abi }: { abi: TAbi }) => {
+type TParserOf<T extends { parser: (args: { abi: TAbi }) => object }> = ReturnType<T["parser"]>;
+
+type TRtnetlinkStructures = {
+  abi: TAbi;
+  ifinfomsg: TParserOf<typeof ifinfomsg>;
+  rtattr: TParserOf<typeof rtattr>;
+};
+
+const createRtnetlinkStructuresFor = ({ abi }: { abi: TAbi }): TRtnetlinkStructures => {
   return {
     abi,
     ifinfomsg: ifinfomsg.parser({ abi }),
     rtattr: rtattr.parser({ abi }),
   };
 };
-
-type TRtnetlinkStructures = ReturnType<typeof createRtnetlinkStructuresFor>;
 
 const hostStructures = createRtnetlinkStructuresFor({ abi: hostAbi });
 
