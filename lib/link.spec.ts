@@ -1,8 +1,16 @@
 import assert from "node:assert";
 import { describe, it } from "mocha";
 import { NLM_F_CREATE, NLM_F_EXCL } from "node-netlink";
-import { IFF_LOOPBACK, IFF_PROMISC, IFF_UP, RTM_NEWLINK } from "./constants.ts";
+import {
+  IFF_LOOPBACK,
+  IFF_PROMISC,
+  IFF_UP,
+  IFLA_NET_NS_FD,
+  IFLA_NET_NS_PID,
+  RTM_NEWLINK
+} from "./constants.ts";
 import { parseIfinfoPayload } from "./ifinfo.ts";
+import { u32Codec } from "./rtattr.ts";
 import { createRtnetlink } from "./rtnetlink.ts";
 import { hostStructures } from "./structures.ts";
 import { createFakeKernel, ethernet, loopback } from "./test-support/fake-kernel.ts";
@@ -263,6 +271,71 @@ describe("link", () => {
 
       await assert.rejects(link.createLink({ linkinfo: { kind: "wireguard" } }), /creating link failed with EOPNOTSUPP/);
       assert.strictEqual(kernel.requests().length, 2);
+    });
+  });
+
+  describe("network namespaces", () => {
+    it("should create a link in another namespace by file descriptor", async () => {
+      const { kernel, link } = createTestSetup();
+
+      await link.createLinkInNamespace({
+        netns: { fd: 9 },
+        name: "macvtap0",
+        linkIndex: 2,
+        linkinfo: { kind: "macvtap", data: { mode: "bridge" } },
+        flags: { IFF_UP: true },
+      });
+
+      const { header, ifi, rta } = lastRequest({ kernel });
+      assert.strictEqual(header.nlmsg_flags, NLM_F_CREATE | NLM_F_EXCL);
+      assert.strictEqual(ifi.ifi_index, 0n);
+      assert.strictEqual(ifi.ifi_change, IFF_UP);
+      assert.deepStrictEqual(rta.at(-1), { rta_type: IFLA_NET_NS_FD, data: u32Codec.format({ value: 9, structures }) });
+
+      assert.deepStrictEqual(kernel.linksInNamespace({ netns: "fd:9" }).map(({ name, linkIndex }) => {
+        return { name, linkIndex };
+      }), [{ name: "macvtap0", linkIndex: 2 }]);
+      assert.deepStrictEqual(ifindexesOf({ links: kernel.links() }), [1, 2]);
+    });
+
+    it("should create a link in the namespace of a process", async () => {
+      const { kernel, link } = createTestSetup();
+
+      await link.createLinkInNamespace({ netns: { pid: 1234 }, name: "dummy0", linkinfo: { kind: "dummy" } });
+
+      assert.deepStrictEqual(lastRequest({ kernel }).rta.at(-1), {
+        rta_type: IFLA_NET_NS_PID,
+        data: u32Codec.format({ value: 1234, structures }),
+      });
+      assert.strictEqual(kernel.linksInNamespace({ netns: "pid:1234" }).length, 1);
+    });
+
+    it("should reject if the name is taken in the other namespace", async () => {
+      const { link } = createTestSetup();
+
+      await link.createLinkInNamespace({ netns: { fd: 9 }, name: "dummy0", linkinfo: { kind: "dummy" } });
+
+      await assert.rejects(link.createLinkInNamespace({ netns: { fd: 9 }, name: "dummy0", linkinfo: { kind: "dummy" } }), /EEXIST/);
+    });
+
+    it("should move a link into another namespace", async () => {
+      const { kernel, link } = createTestSetup();
+
+      await link.fromIndex({ ifindex: 2 }).moveToNamespace({ netns: { fd: 9 } });
+
+      const { ifi, rta } = lastRequest({ kernel });
+      assert.strictEqual(ifi.ifi_index, 2n);
+      assert.deepStrictEqual(rta, [{ rta_type: IFLA_NET_NS_FD, data: u32Codec.format({ value: 9, structures }) }]);
+      assert.deepStrictEqual(ifindexesOf({ links: kernel.links() }), [1]);
+      assert.deepStrictEqual(kernel.linksInNamespace({ netns: "fd:9" }).map(({ name }) => {
+        return name;
+      }), ["eth0"]);
+    });
+
+    it("should reject moving a link that does not exist", async () => {
+      const { link } = createTestSetup();
+
+      await assert.rejects(link.fromIndex({ ifindex: 42 }).moveToNamespace({ netns: { pid: 1 } }), /ENODEV/);
     });
   });
 });

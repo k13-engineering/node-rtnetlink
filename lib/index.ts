@@ -60,6 +60,7 @@ export type {
   TLinkTryTalkResult,
 } from "./rtnetlink.ts";
 export type {
+  TNetns,
   TLink,
   TLinkApi,
   TLinkInfo,

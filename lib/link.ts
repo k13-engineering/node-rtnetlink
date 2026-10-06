@@ -3,6 +3,8 @@ import { createErrorFromErrno, NLM_F_CREATE, NLM_F_DUMP, NLM_F_EXCL } from "node
 import {
   AF_PACKET,
   AF_UNSPEC,
+  IFLA_NET_NS_FD,
+  IFLA_NET_NS_PID,
   RTM_DELLINK,
   RTM_GETLINK,
   RTM_NEWLINK
@@ -18,7 +20,7 @@ import {
   type TLinkFlagName,
   type TLinkFlags
 } from "./link-flags.ts";
-import type { TRtattr } from "./rtattr.ts";
+import { u32Codec, type TRtattr } from "./rtattr.ts";
 import type { TLinkMessage, TLinkRequest, TLinkTryTalkResult } from "./rtnetlink.ts";
 import type { TRtnetlinkStructures } from "./structures.ts";
 
@@ -35,6 +37,10 @@ type TLinkInfo = TLinkAttributes & {
   unknownAttributes: TRtattr[];
 };
 
+// a network namespace, given by a file descriptor referring to it, e.g. an open /proc/<pid>/ns/net,
+// or by the pid of a process in it
+type TNetns = { fd: number } | { pid: number };
+
 type TLink = {
   ifindex: number;
   // fetches the current state of the link, rejects with ENODEV if it does not exist (anymore)
@@ -43,6 +49,8 @@ type TLink = {
   modify: (args: TLinkAttributes & { flags?: TLinkFlags }) => Promise<void>;
   // deletes the link
   deleteLink: () => Promise<void>;
+  // moves the link into another network namespace, where it may get another index, the link is gone from this one afterwards
+  moveToNamespace: (args: { netns: TNetns }) => Promise<void>;
 };
 
 type TLinkCriteria = TLinkAttributes & {
@@ -57,6 +65,8 @@ type TLinkApi = {
   tryFindOneBy: (criteria: TLinkCriteria) => Promise<TLink | undefined>;
   findOneBy: (criteria: TLinkCriteria) => Promise<TLink>;
   createLink: (args: TLinkAttributes & { flags?: TLinkFlags }) => Promise<TLink>;
+  // creates a link directly in another network namespace, where the kernel picks its index, so it is found by its name there
+  createLinkInNamespace: (args: TLinkAttributes & { netns: TNetns, name: string, flags?: TLinkFlags }) => Promise<void>;
 };
 
 type TLinkRt = {
@@ -102,6 +112,14 @@ const linkMatches = ({ info, criteria }: { info: TLinkInfo, criteria: TLinkCrite
 };
 
 // spelled out, as the declaration files are generated per file and could not infer the types of async functions
+const netnsAttribute = ({ netns, structures }: { netns: TNetns, structures: TRtnetlinkStructures }): TRtattr => {
+  if ("fd" in netns) {
+    return { rta_type: IFLA_NET_NS_FD, data: u32Codec.format({ value: netns.fd, structures }) };
+  }
+
+  return { rta_type: IFLA_NET_NS_PID, data: u32Codec.format({ value: netns.pid, structures }) };
+};
+
 const createLinkApi = ({ rt, structures }: { rt: TLinkRt, structures: TRtnetlinkStructures }): TLinkApi => {
 
   const fromIndex = ({ ifindex }: { ifindex: number }): TLink => {
@@ -129,11 +147,20 @@ const createLinkApi = ({ rt, structures }: { rt: TLinkRt, structures: TRtnetlink
       });
     };
 
+    const moveToNamespace: TLink["moveToNamespace"] = async ({ netns }) => {
+      await rt.talk({
+        header: { nlmsg_type: RTM_NEWLINK },
+        ifi: { ifi_family: AF_UNSPEC, ifi_index: BigInt(ifindex) },
+        rta: [netnsAttribute({ netns, structures })],
+      });
+    };
+
     return {
       ifindex,
       fetch,
       modify,
       deleteLink,
+      moveToNamespace,
     };
   };
 
@@ -237,6 +264,14 @@ const createLinkApi = ({ rt, structures }: { rt: TLinkRt, structures: TRtnetlink
     return createWithRetries({ attemptsLeft: MAX_CREATE_ATTEMPTS, flags, attributes });
   };
 
+  const createLinkInNamespace: TLinkApi["createLinkInNamespace"] = async ({ netns, flags = {}, ...attributes }) => {
+    await rt.talk({
+      header: { nlmsg_type: RTM_NEWLINK, nlmsg_flags: NLM_F_CREATE | NLM_F_EXCL },
+      ifi: { ifi_family: AF_UNSPEC, ...formatLinkFlags({ flags }) },
+      rta: [...formatLinkAttributes({ attributes, structures }), netnsAttribute({ netns, structures })],
+    });
+  };
+
   return {
     fromIndex,
     listAll,
@@ -244,6 +279,7 @@ const createLinkApi = ({ rt, structures }: { rt: TLinkRt, structures: TRtnetlink
     tryFindOneBy,
     findOneBy,
     createLink,
+    createLinkInNamespace,
   };
 };
 
@@ -252,6 +288,7 @@ export {
 };
 
 export type {
+  TNetns,
   TLink,
   TLinkApi,
   TLinkInfo,

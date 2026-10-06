@@ -109,6 +109,29 @@ await bridge.deleteLink();
 
 Errors of the kernel reject with an error that has the `errno` attached, e.g. `creating link failed with EPERM`.
 
+### Network namespaces
+
+A NETLINK_ROUTE socket works on the network namespace it was created in. Links can be created in, or moved to, another namespace, given by a file descriptor referring to it (`IFLA_NET_NS_FD`) or the pid of a process in it (`IFLA_NET_NS_PID`):
+
+```ts
+// e.g. the namespace of a container
+const netns = { fd: po6.open({ pathname: "/proc/1234/ns/net", flags: O_RDONLY | O_CLOEXEC }).fd };
+
+// a macvtap on eth0 of this namespace, created directly in the other one
+const eth0 = await rt.link.findOneBy({ name: "eth0" });
+await rt.link.createLinkInNamespace({
+  netns,
+  name: "macvtap0",
+  linkIndex: eth0.ifindex,
+  linkinfo: { kind: "macvtap", data: { mode: "bridge" } },
+});
+
+// or move an existing link there
+await (await rt.link.findOneBy({ name: "dummy0" })).moveToNamespace({ netns });
+```
+
+The kernel picks the index of the link in the other namespace and does not report it, so `createLinkInNamespace()` needs a `name` and resolves without a link. To work with the link afterwards, e.g. to bring it up, use a `createRtnetlink()` instance whose socket was created in that namespace. With po6, enter the namespace with `setns()`, create the socket and switch back, see the po6 README.
+
 ### Notifications
 
 Bind the socket to `RTMGRP_LINK` and parse the messages node-netlink passes to `onMessage`:
@@ -153,6 +176,7 @@ Returns `{ link, talk, tryTalk }`.
 | `tryFindOneBy(criteria)` | like `findOneBy()`, but resolves with `undefined` instead of rejecting |
 | `fromIndex({ ifindex })` | returns the link with this index, without talking to the kernel |
 | `createLink({ flags?, ...attributes })` | creates a link and resolves with it |
+| `createLinkInNamespace({ netns, name, flags?, ...attributes })` | creates a link directly in another network namespace, see [Network namespaces](#network-namespaces) |
 
 The criteria are link attributes, `type` and `flags`. A link matches if all given values are equal. For `linkinfo`, only the given fields are compared, and for `flags`, only the given flags. The links are filtered after dumping all of them, as the kernel can only look up single links by name or index.
 
@@ -166,6 +190,7 @@ A link (`TLink`) has:
 | `fetch()` | resolves with the current `TLinkInfo`, rejects with `ENODEV` if the link does not exist |
 | `modify({ flags?, ...attributes })` | changes the given attributes and flags |
 | `deleteLink()` | deletes the link |
+| `moveToNamespace({ netns })` | moves the link into another network namespace, where it may get another index. The handle is of no use afterwards |
 
 `TLinkInfo` contains `ifindex`, `type` (`ARPHRD_*`), `flags`, the link attributes the kernel reported and `unknownAttributes`, the raw `rtattr`s node-rtnetlink has no definition for.
 

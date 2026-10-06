@@ -76,6 +76,15 @@ describe("node-rtnetlink on the host kernel", () => {
     });
     assert.deepStrictEqual(result.bridgeIndexes, [result.bridgeIndex]);
     assert.match(result.duplicate, /creating link failed with EEXIST/);
+
+    const { namespaces } = result;
+    assert.ok(namespaces.outerNames.includes("nrt-lower1"));
+    assert.ok(!namespaces.outerNames.includes("nrt-nsmvt0") && !namespaces.outerNames.includes("nrt-move0"));
+    assert.deepStrictEqual(new Set(namespaces.innerNames), new Set(["lo", "nrt-move0", "nrt-nsmvt0"]));
+    assert.deepStrictEqual(namespaces.macvtap, {
+      linkIndex: namespaces.outerLowerIndex,
+      linkinfo: { kind: "macvtap", data: { mode: "bridge" } },
+    });
     assert.deepStrictEqual(result.macvtap, {
       lowerIndex: result.macvtap.lowerIndex,
       linkIndex: result.macvtap.lowerIndex,

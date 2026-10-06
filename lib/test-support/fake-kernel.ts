@@ -7,13 +7,20 @@ import {
   type TNetlinkMessage,
   type TTalkArgs
 } from "node-netlink";
-import { RTM_DELLINK, RTM_GETLINK, RTM_NEWLINK } from "../constants.ts";
+import {
+  IFLA_NET_NS_FD,
+  IFLA_NET_NS_PID,
+  RTM_DELLINK,
+  RTM_GETLINK,
+  RTM_NEWLINK
+} from "../constants.ts";
 import { formatIfinfoPayload, parseIfinfoPayload, type TIfinfomsg } from "../ifinfo.ts";
 import {
   formatLinkAttributes,
   parseLinkAttributes,
   type TLinkAttributes
 } from "../link-attributes.ts";
+import { typeOfAttribute, u32Codec, type TRtattr } from "../rtattr.ts";
 import type { TRtnetlinkNetlink } from "../rtnetlink.ts";
 import { hostStructures } from "../structures.ts";
 
@@ -38,6 +45,22 @@ type TRequest = {
   ifi: TIfinfomsg;
   attributes: TLinkAttributes;
   flags: bigint;
+  // the network namespace of IFLA_NET_NS_FD or IFLA_NET_NS_PID, e.g. "fd:5"
+  netns: string | undefined;
+};
+
+const netnsOf = ({ unknown }: { unknown: TRtattr[] }) => {
+  const prefixes: Record<string, string> = { [IFLA_NET_NS_FD.toString()]: "fd", [IFLA_NET_NS_PID.toString()]: "pid" };
+
+  const attribute = unknown.find((candidate) => {
+    return Object.hasOwn(prefixes, typeOfAttribute({ attribute: candidate }).toString());
+  });
+
+  if (attribute === undefined) {
+    return undefined;
+  }
+
+  return `${prefixes[typeOfAttribute({ attribute }).toString()]}:${u32Codec.parse({ data: attribute.data, structures })}`;
 };
 
 const ok = ({ messages = [] }: { messages?: TNetlinkMessage[] } = {}): TResult => {
@@ -57,6 +80,8 @@ const createFakeKernel = ({ links: initialLinks }: { links: TFakeLink[] }) => {
   let requests: TTalkArgs[] = [];
   let injectedResults: TResult[] = [];
   let beforeCreate = () => {};
+  // links in other network namespaces, which requests of this socket do not see
+  let foreignLinks: { netns: string, link: TFakeLink }[] = [];
 
   const messageOf = ({ link, nlmsg_flags = 0n }: { link: TFakeLink, nlmsg_flags?: bigint }): TNetlinkMessage => {
     const { ifindex, type, flags, ...attributes } = link;
@@ -144,12 +169,53 @@ const createFakeKernel = ({ links: initialLinks }: { links: TFakeLink[] }) => {
     return ok();
   };
 
-  const newLink = (request: TRequest) => {
-    if ((request.flags & NLM_F_CREATE) !== 0n && (request.flags & NLM_F_EXCL) !== 0n) {
-      return createLink(request);
+  const linksInNamespace = ({ netns }: { netns: string }) => {
+    return foreignLinks.filter((foreign) => {
+      return foreign.netns === netns;
+    }).map(({ link }) => {
+      return link;
+    });
+  };
+
+  // the kernel picks the index in the other namespace
+  const createInNamespace = ({ attributes, netns }: TRequest) => {
+    const namespaceLinks = linksInNamespace({ netns: netns as string });
+
+    if (namespaceLinks.some((link) => {
+      return link.name === attributes.name;
+    })) {
+      return fail({ errno: EEXIST });
     }
 
-    return changeLink(request);
+    const link = { ifindex: namespaceLinks.length + 1, type: 1, ...attributes, flags: 0n };
+    foreignLinks = [...foreignLinks, { netns: netns as string, link }];
+    return ok();
+  };
+
+  const moveToNamespace = ({ ifi, netns }: TRequest) => {
+    const link = findByIndex({ ifindex: ifi.ifi_index });
+
+    if (link === undefined) {
+      return fail({ errno: ENODEV });
+    }
+
+    links = links.filter((other) => {
+      return other !== link;
+    });
+    foreignLinks = [...foreignLinks, { netns: netns as string, link }];
+    return ok();
+  };
+
+  const isCreation = ({ flags }: TRequest) => {
+    return (flags & NLM_F_CREATE) !== 0n && (flags & NLM_F_EXCL) !== 0n;
+  };
+
+  const newLink = (request: TRequest) => {
+    if (request.netns !== undefined) {
+      return isCreation(request) ? createInNamespace(request) : moveToNamespace(request);
+    }
+
+    return isCreation(request) ? createLink(request) : changeLink(request);
   };
 
   const deleteLink = ({ ifi }: TRequest) => {
@@ -180,9 +246,14 @@ const createFakeKernel = ({ links: initialLinks }: { links: TFakeLink[] }) => {
     }
 
     const { ifi, rta } = parseIfinfoPayload({ payload: args.payload, structures });
-    const { attributes } = parseLinkAttributes({ rta, structures });
+    const { attributes, unknown } = parseLinkAttributes({ rta, structures });
 
-    return handlers[args.header.nlmsg_type.toString()]({ ifi, attributes, flags: args.header.nlmsg_flags ?? 0n });
+    return handlers[args.header.nlmsg_type.toString()]({
+      ifi,
+      attributes,
+      flags: args.header.nlmsg_flags ?? 0n,
+      netns: netnsOf({ unknown }),
+    });
   };
 
   const netlink: TRtnetlinkNetlink = {
@@ -206,6 +277,7 @@ const createFakeKernel = ({ links: initialLinks }: { links: TFakeLink[] }) => {
     links: () => {
       return links;
     },
+    linksInNamespace,
     requests: () => {
       return requests;
     },

@@ -2,7 +2,7 @@
 // Needs CAP_NET_ADMIN, so it is run in a fresh network namespace, e.g. `sudo unshare -n node link-lifecycle.ts`.
 
 import { createRtnetlink } from "../index.ts";
-import { openHostNetlinkSocket } from "./host-socket.ts";
+import { createNetns, openHostNetlinkSocket, po6 } from "./host-socket.ts";
 
 const { netlink, close } = openHostNetlinkSocket();
 
@@ -32,6 +32,39 @@ try {
     return error.message;
   });
 
+  // a second network namespace with its own socket, like a container
+  const netnsFd = createNetns();
+  const inner = openHostNetlinkSocket({ netnsFd });
+  const innerLink = createRtnetlink({ netlink: inner.netlink }).link;
+
+  const namesOf = async ({ api }: { api: typeof link }) => {
+    return (await api.listAll()).map(({ name }) => {
+      return name;
+    });
+  };
+
+  // a macvtap on a lower link of this namespace, created directly in the other one
+  const outerLower = await link.createLink({ name: "nrt-lower1", linkinfo: { kind: "dummy" } });
+  await link.createLinkInNamespace({
+    netns: { fd: netnsFd },
+    name: "nrt-nsmvt0",
+    linkIndex: outerLower.ifindex,
+    linkinfo: { kind: "macvtap", data: { mode: "bridge" } },
+  });
+
+  const moved = await link.createLink({ name: "nrt-move0", linkinfo: { kind: "dummy" } });
+  await moved.moveToNamespace({ netns: { fd: netnsFd } });
+
+  const outerNames = await namesOf({ api: link });
+  const innerNames = await namesOf({ api: innerLink });
+  const nsMacvtap = await (await innerLink.findOneBy({ name: "nrt-nsmvt0" })).fetch();
+
+  await (await innerLink.findOneBy({ name: "nrt-nsmvt0" })).deleteLink();
+  await (await innerLink.findOneBy({ name: "nrt-move0" })).deleteLink();
+  await outerLower.deleteLink();
+  inner.close();
+  po6.close({ fd: netnsFd });
+
   await dummy.deleteLink();
   await bridge.deleteLink();
 
@@ -51,6 +84,12 @@ try {
       return ifindex;
     }),
     duplicate,
+    namespaces: {
+      outerNames,
+      innerNames,
+      outerLowerIndex: outerLower.ifindex,
+      macvtap: { linkIndex: nsMacvtap.linkIndex, linkinfo: nsMacvtap.linkinfo },
+    },
     macvtap: {
       lowerIndex: lower.ifindex,
       linkIndex: macvtapInfo.linkIndex,
