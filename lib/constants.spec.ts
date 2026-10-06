@@ -13,7 +13,7 @@ const printStatementFor = ({ name }: { name: string }) => {
 
 // enums of the kernel headers are no macros, so they are printed directly
 const enumNames = new Set(Object.keys(constants).filter((name) => {
-  return ["IFLA_", "RTM_", "IFF_", "MACVLAN_"].some((prefix) => {
+  return ["IFLA_", "RTM_", "IFF_", "MACVLAN_", "IFA_", "RT_SCOPE_"].some((prefix) => {
     return name.startsWith(prefix);
   });
 }));
@@ -37,6 +37,7 @@ const valuesFromCHeaders = async ({ names }: { names: string[] }) => {
 #include <linux/netlink.h>
 #include <linux/rtnetlink.h>
 #include <linux/if_link.h>
+#include <linux/if_addr.h>
 #include <linux/if.h>
 
 int main(void) {

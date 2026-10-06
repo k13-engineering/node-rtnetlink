@@ -20,6 +20,7 @@ import {
   createRtnetlinkStructuresFor,
   hostStructures,
   ifinfomsgDefinition,
+  ifaddrmsgDefinition,
   rtattrDefinition
 } from "./structures.ts";
 
@@ -54,6 +55,7 @@ export {
   hostStructures,
   ifinfomsgDefinition,
   rtattrDefinition,
+  ifaddrmsgDefinition,
 };
 
 export type {

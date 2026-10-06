@@ -1,8 +1,10 @@
-// values from <sys/socket.h>, <linux/rtnetlink.h>, <linux/if_link.h>, <linux/if.h> and <linux/netlink.h>
+// values from <sys/socket.h>, <linux/rtnetlink.h>, <linux/if_link.h>, <linux/if_addr.h>, <linux/if.h> and <linux/netlink.h>
 
 // address families, used as ifi_family
 const AF_UNSPEC = 0n;
 const AF_PACKET = 17n;
+const AF_INET = 2n;
+const AF_INET6 = 10n;
 
 // rtnetlink message types for links
 const RTM_NEWLINK = 16n;
@@ -10,8 +12,15 @@ const RTM_DELLINK = 17n;
 const RTM_GETLINK = 18n;
 const RTM_SETLINK = 19n;
 
+// rtnetlink message types for addresses
+const RTM_NEWADDR = 20n;
+const RTM_DELADDR = 21n;
+const RTM_GETADDR = 22n;
+
 // multicast group for link notifications, to be bound as nl_groups
 const RTMGRP_LINK = 1n;
+const RTMGRP_IPV4_IFADDR = 0x10n;
+const RTMGRP_IPV6_IFADDR = 0x100n;
 
 // link attributes
 const IFLA_UNSPEC = 0n;
@@ -52,6 +61,41 @@ const MACVLAN_MODE_BRIDGE = 4n;
 const MACVLAN_MODE_PASSTHRU = 8n;
 const MACVLAN_MODE_SOURCE = 16n;
 
+// address attributes
+const IFA_UNSPEC = 0n;
+const IFA_ADDRESS = 1n;
+const IFA_LOCAL = 2n;
+const IFA_LABEL = 3n;
+const IFA_BROADCAST = 4n;
+const IFA_ANYCAST = 5n;
+const IFA_CACHEINFO = 6n;
+const IFA_MULTICAST = 7n;
+const IFA_FLAGS = 8n;
+const IFA_RT_PRIORITY = 9n;
+const IFA_TARGET_NETNSID = 10n;
+
+// address flags, the lower 8 bits in ifa_flags, all of them in IFA_FLAGS
+const IFA_F_SECONDARY = 0x01n;
+const IFA_F_TEMPORARY = 0x01n;
+const IFA_F_NODAD = 0x02n;
+const IFA_F_OPTIMISTIC = 0x04n;
+const IFA_F_DADFAILED = 0x08n;
+const IFA_F_HOMEADDRESS = 0x10n;
+const IFA_F_DEPRECATED = 0x20n;
+const IFA_F_TENTATIVE = 0x40n;
+const IFA_F_PERMANENT = 0x80n;
+const IFA_F_MANAGETEMPADDR = 0x100n;
+const IFA_F_NOPREFIXROUTE = 0x200n;
+const IFA_F_MCAUTOJOIN = 0x400n;
+const IFA_F_STABLE_PRIVACY = 0x800n;
+
+// scopes of addresses, ifa_scope
+const RT_SCOPE_UNIVERSE = 0n;
+const RT_SCOPE_SITE = 200n;
+const RT_SCOPE_LINK = 253n;
+const RT_SCOPE_HOST = 254n;
+const RT_SCOPE_NOWHERE = 255n;
+
 // flags of an rtattr type
 const NLA_F_NESTED = 0x8000n;
 const NLA_F_NET_BYTEORDER = 0x4000n;
@@ -81,13 +125,21 @@ const IFF_ECHO = 0x40000n;
 export {
   AF_UNSPEC,
   AF_PACKET,
+  AF_INET,
+  AF_INET6,
 
   RTM_NEWLINK,
   RTM_DELLINK,
   RTM_GETLINK,
   RTM_SETLINK,
 
+  RTM_NEWADDR,
+  RTM_DELADDR,
+  RTM_GETADDR,
+
   RTMGRP_LINK,
+  RTMGRP_IPV4_IFADDR,
+  RTMGRP_IPV6_IFADDR,
 
   IFLA_UNSPEC,
   IFLA_ADDRESS,
@@ -123,6 +175,38 @@ export {
   MACVLAN_MODE_BRIDGE,
   MACVLAN_MODE_PASSTHRU,
   MACVLAN_MODE_SOURCE,
+
+  IFA_UNSPEC,
+  IFA_ADDRESS,
+  IFA_LOCAL,
+  IFA_LABEL,
+  IFA_BROADCAST,
+  IFA_ANYCAST,
+  IFA_CACHEINFO,
+  IFA_MULTICAST,
+  IFA_FLAGS,
+  IFA_RT_PRIORITY,
+  IFA_TARGET_NETNSID,
+
+  IFA_F_SECONDARY,
+  IFA_F_TEMPORARY,
+  IFA_F_NODAD,
+  IFA_F_OPTIMISTIC,
+  IFA_F_DADFAILED,
+  IFA_F_HOMEADDRESS,
+  IFA_F_DEPRECATED,
+  IFA_F_TENTATIVE,
+  IFA_F_PERMANENT,
+  IFA_F_MANAGETEMPADDR,
+  IFA_F_NOPREFIXROUTE,
+  IFA_F_MCAUTOJOIN,
+  IFA_F_STABLE_PRIVACY,
+
+  RT_SCOPE_UNIVERSE,
+  RT_SCOPE_SITE,
+  RT_SCOPE_LINK,
+  RT_SCOPE_HOST,
+  RT_SCOPE_NOWHERE,
 
   NLA_F_NESTED,
   NLA_F_NET_BYTEORDER,

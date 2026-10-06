@@ -6,6 +6,7 @@ import {
   createRtnetlinkStructuresFor,
   hostStructures,
   ifinfomsgDefinition,
+  ifaddrmsgDefinition,
   rtattrDefinition
 } from "./structures.ts";
 import { compileAndRun } from "./test-support/compile-and-run.ts";
@@ -13,11 +14,13 @@ import { compileAndRun } from "./test-support/compile-and-run.ts";
 const globalCode = `
 #include <sys/socket.h>
 #include <linux/rtnetlink.h>
+#include <linux/if_addr.h>
 `;
 
 const structs = [
   { cStructName: "ifinfomsg", structDefinition: ifinfomsgDefinition },
   { cStructName: "rtattr", structDefinition: rtattrDefinition },
+  { cStructName: "ifaddrmsg", structDefinition: ifaddrmsgDefinition },
 ];
 
 describe("structures", () => {
@@ -41,6 +44,7 @@ describe("structures", () => {
     it("should have the sizes defined by the kernel ABI", () => {
       assert.strictEqual(hostStructures.ifinfomsg.size, 16);
       assert.strictEqual(hostStructures.rtattr.size, 4);
+      assert.strictEqual(hostStructures.ifaddrmsg.size, 8);
     });
   });
 

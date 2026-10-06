@@ -247,11 +247,11 @@ const messages = await rt.talk({
 | `typeOfAttribute({ attribute })` | the type of an `rtattr` without `NLA_F_NESTED` and `NLA_F_NET_BYTEORDER` |
 | `stringCodec`, `u32Codec`, `bytesCodec` | codecs of attribute values |
 
-Pass `hostStructures` as `structures`, or `createRtnetlinkStructuresFor({ abi })` for another byte order.
+Pass `hostStructures` as `structures`, or `createRtnetlinkStructuresFor({ abi })` for another byte order. The ya-struct definitions of the structures are exported as `ifinfomsgDefinition`, `rtattrDefinition` and `ifaddrmsgDefinition`.
 
 ### Constants
 
-`AF_UNSPEC`, `AF_PACKET`, `RTM_*LINK`, `RTMGRP_LINK`, the attribute types `IFLA_*`, `IFLA_INFO_*` and `IFLA_MACVLAN_*`, the macvlan modes `MACVLAN_MODE_*`, `NLA_F_*`, `NLA_TYPE_MASK` and the link flags `IFF_*` are exported as `bigint`s.
+`AF_UNSPEC`, `AF_PACKET`, `AF_INET`, `AF_INET6`, `RTM_*LINK`, `RTM_*ADDR`, `RTMGRP_LINK`, `RTMGRP_IPV4_IFADDR`, `RTMGRP_IPV6_IFADDR`, the address attributes `IFA_*`, the address flags `IFA_F_*`, the scopes `RT_SCOPE_*`, the attribute types `IFLA_*`, `IFLA_INFO_*` and `IFLA_MACVLAN_*`, the macvlan modes `MACVLAN_MODE_*`, `NLA_F_*`, `NLA_TYPE_MASK` and the link flags `IFF_*` are exported as `bigint`s.
 
 ## Migrating from 0.0.x
 
