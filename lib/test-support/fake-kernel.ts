@@ -21,6 +21,7 @@ import {
   type TLinkAttributes
 } from "../link-attributes.ts";
 import { typeOfAttribute, u32Codec, type TRtattr } from "../rtattr.ts";
+import { createFakeAddresses } from "./fake-addresses.ts";
 import type { TRtnetlinkNetlink } from "../rtnetlink.ts";
 import { hostStructures } from "../structures.ts";
 
@@ -80,6 +81,14 @@ const createFakeKernel = ({ links: initialLinks }: { links: TFakeLink[] }) => {
   let requests: TTalkArgs[] = [];
   let injectedResults: TResult[] = [];
   let beforeCreate = () => {};
+  const fakeAddresses = createFakeAddresses({
+    hasLink: ({ ifindex }) => {
+      return links.some((link) => {
+        return BigInt(link.ifindex) === ifindex;
+      });
+    },
+  });
+
   // links in other network namespaces, which requests of this socket do not see
   let foreignLinks: { netns: string, link: TFakeLink }[] = [];
 
@@ -245,6 +254,10 @@ const createFakeKernel = ({ links: initialLinks }: { links: TFakeLink[] }) => {
       return injected;
     }
 
+    if (fakeAddresses.handles({ args })) {
+      return fakeAddresses.handle({ args });
+    }
+
     const { ifi, rta } = parseIfinfoPayload({ payload: args.payload, structures });
     const { attributes, unknown } = parseLinkAttributes({ rta, structures });
 
@@ -278,6 +291,7 @@ const createFakeKernel = ({ links: initialLinks }: { links: TFakeLink[] }) => {
       return links;
     },
     linksInNamespace,
+    addresses: fakeAddresses.addresses,
     requests: () => {
       return requests;
     },

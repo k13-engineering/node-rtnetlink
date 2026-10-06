@@ -3,7 +3,7 @@
 [![CI](https://github.com/k13-engineering/node-rtnetlink/actions/workflows/ci.yml/badge.svg)](https://github.com/k13-engineering/node-rtnetlink/actions/workflows/ci.yml)
 [![npm](https://img.shields.io/npm/v/node-rtnetlink)](https://www.npmjs.com/package/node-rtnetlink)
 
-Linux [rtnetlink](https://man7.org/linux/man-pages/man7/rtnetlink.7.html) for Node.js, written in TypeScript: list, find, create, modify and delete network interfaces.
+Linux [rtnetlink](https://man7.org/linux/man-pages/man7/rtnetlink.7.html) for Node.js, written in TypeScript: list, find, create, modify and delete network interfaces, and assign IP addresses to them.
 
 - **Bring your own socket.** node-rtnetlink talks through a [node-netlink](https://www.npmjs.com/package/node-netlink) socket that you pass in. It never opens, binds or closes a socket itself.
 - **High-level link API.** Links are plain objects with `name`, `mtu`, `address`, `flags`, `linkinfo` and more, instead of raw attributes.
@@ -109,6 +109,25 @@ await bridge.deleteLink();
 
 Errors of the kernel reject with an error that has the `errno` attached, e.g. `creating link failed with EPERM`.
 
+### Addresses
+
+```ts
+const eth0 = await rt.link.findOneBy({ name: "eth0" });
+
+// the kernel adds the route to the subnet by itself
+await rt.address.add({ ifindex: eth0.ifindex, address: "192.0.2.10", prefixLength: 24 });
+await rt.address.add({ ifindex: eth0.ifindex, address: "2001:db8::10", prefixLength: 64, flags: { IFA_F_NODAD: true } });
+
+const addresses = await rt.address.listAll({ ifindex: eth0.ifindex });
+addresses.forEach(({ family, address, prefixLength }) => {
+  console.log(`${family} ${address}/${prefixLength}`);
+});
+
+await rt.address.remove({ ifindex: eth0.ifindex, address: "192.0.2.10", prefixLength: 24 });
+```
+
+Addresses of a link in another network namespace are assigned with a `createRtnetlink()` instance whose socket was created in that namespace, as `RTM_NEWADDR` has no attribute for the namespace.
+
 ### Network namespaces
 
 A NETLINK_ROUTE socket works on the network namespace it was created in. Links can be created in, or moved to, another namespace, given by a file descriptor referring to it (`IFLA_NET_NS_FD`) or the pid of a process in it (`IFLA_NET_NS_PID`):
@@ -164,7 +183,7 @@ All functions take a single object of arguments.
 - `netlink`: a node-netlink socket, or anything with its `talk()` and `tryTalk()`, e.g. a fake in tests
 - `structures`: layouts of the kernel structures, `hostStructures` by default
 
-Returns `{ link, talk, tryTalk }`.
+Returns `{ link, address, talk, tryTalk }`.
 
 ### `rt.link`
 
@@ -222,6 +241,20 @@ const macvtap = await rt.link.createLink({
 
 `flags` is an object with the `IFF_*` flags of `<linux/if.h>` as keys, e.g. `{ IFF_UP: true, IFF_PROMISC: false }`. In `TLinkInfo`, all flags are present. For `modify()` and `createLink()`, `true` sets a flag, `false` clears it, and flags that are not given stay unchanged.
 
+### `rt.address`
+
+| Function | Description |
+| --- | --- |
+| `add({ ifindex, address, prefixLength, peer?, broadcast?, label?, scope?, flags? })` | assigns an address to a link, rejects with `EEXIST` if it has it already |
+| `remove({ ifindex, address, prefixLength })` | removes an address from a link, rejects with `EADDRNOTAVAIL` if it does not have it |
+| `listAll({ ifindex?, family? })` | resolves with a `TAddressInfo` for every address, of all links or the given one, and of both or the given family |
+
+Addresses are strings like `"192.0.2.1"` or `"2001:db8::1"`, the family (`"inet"` or `"inet6"`) follows from them. `add()` sends the address as `IFA_LOCAL` and `IFA_ADDRESS`, or `peer` as `IFA_ADDRESS` for point-to-point links. `scope` is `"universe"` (default), `"site"`, `"link"`, `"host"` or `"nowhere"`. `flags` is an object with the `IFA_F_*` flags as keys, e.g. `{ IFA_F_NODAD: true }`, sent in `ifa_flags` and, as some do not fit there, in `IFA_FLAGS`.
+
+`TAddressInfo` contains `ifindex`, `family`, `address`, `prefixLength`, `scope`, all `flags`, and `peer`, `broadcast` and `label` if the kernel reports them, as well as `unknownAttributes`, e.g. `IFA_CACHEINFO`. `IFA_F_SECONDARY` and `IFA_F_TEMPORARY` are the same bit, which marks temporary addresses for IPv6.
+
+Like `rt.talk()`, `rt.address.talk({ header, ifa, rta?, timeoutMs? })` and `rt.address.tryTalk()` send address requests (`RTM_NEWADDR`, `RTM_DELADDR` or `RTM_GETADDR`) with a `struct ifaddrmsg` and resolve with the responses as `{ header, ifa, rta }`. For notifications of `RTMGRP_IPV4_IFADDR` and `RTMGRP_IPV6_IFADDR`, `parseAddressMessage({ message })` parses node-netlink messages of address types, and `addressInfoOf({ message })` turns them into a `TAddressInfo`.
+
 ### Low-level API
 
 `rt.talk({ header, ifi, rta?, timeoutMs? })` sends a link request (`RTM_NEWLINK`, `RTM_DELLINK`, `RTM_GETLINK` or `RTM_SETLINK`) and resolves with the responses as `{ header, ifi, rta }`. Missing `ifi` fields are 0. `rt.tryTalk()` resolves with `{ errno, messages }` instead of rejecting.
@@ -240,6 +273,8 @@ const messages = await rt.talk({
 | --- | --- |
 | `parseLinkMessage({ message, structures? })` | parses a node-netlink message of a link type, `undefined` for other types |
 | `formatIfinfoPayload({ ifi, rta?, structures })`, `parseIfinfoPayload({ payload, structures })` | `struct ifinfomsg` followed by attributes |
+| `formatIfaddrPayload({ ifa, rta?, structures })`, `parseIfaddrPayload({ payload, structures })` | `struct ifaddrmsg` followed by attributes |
+| `formatAddressFlags({ flags })`, `parseAddressFlags({ bits })` | address flags from and to the bits of `IFA_FLAGS` |
 | `formatAttributes({ attributes, structures })`, `parseAttributes({ data, structures })` | lists of `rtattr` |
 | `formatLinkAttributes({ attributes, structures })`, `parseLinkAttributes({ rta, structures })` | link attributes from and to `rtattr`s |
 | `formatLinkFlags({ flags })`, `parseLinkFlags({ ifi_flags })` | link flags from and to `ifi_flags` and `ifi_change` |
@@ -278,10 +313,11 @@ The sources are in `lib/`, tests are next to them as `*.spec.ts`:
 
 - `lib/rtnetlink.ts`: link requests on top of an injected node-netlink socket
 - `lib/link.ts`: the high-level link API
-- `lib/link-attributes.ts`, `lib/link-flags.ts`: link attributes and flags
-- `lib/ifinfo.ts`, `lib/rtattr.ts`, `lib/structures.ts`, `lib/constants.ts`: message formats, structure layouts and constants
+- `lib/link-attributes.ts`, `lib/linkinfo.ts`, `lib/link-flags.ts`: link attributes, linkinfo and flags
+- `lib/address.ts`, `lib/ip-address.ts`: the address API and IP addresses
+- `lib/ifinfo.ts`, `lib/ifaddr.ts`, `lib/rtattr.ts`, `lib/structures.ts`, `lib/constants.ts`: message formats, structure layouts and constants
 
-The unit tests run against the fake kernel in `lib/test-support/fake-kernel.ts`. `lib/index.spec.ts` talks to the kernel of the host, which needs no privileges for reading. If `sudo` works without a password, it also creates, modifies and deletes links in a fresh network namespace. The structure layouts and constants are compared with the C headers by compiling C programs, so `gcc` and the Linux headers are required.
+The unit tests run against the fake kernel in `lib/test-support/fake-kernel.ts`. `lib/index.spec.ts` talks to the kernel of the host, which needs no privileges for reading. If `sudo` works without a password, it also creates, modifies and deletes links in a fresh network namespace, creates a macvtap in a second one and assigns addresses to it there. The structure layouts and constants are compared with the C headers by compiling C programs, so `gcc` and the Linux headers are required.
 
 Releases are published by pushing a tag like `v0.1.0`, which builds the package, merges `package.npm.json` into `package.json` and sets the version.
 

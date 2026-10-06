@@ -1,6 +1,7 @@
 import type { TNetlinkHeader, TNetlinkMessage, TNetlinkSocket } from "node-netlink";
 import { RTM_DELLINK, RTM_GETLINK, RTM_NEWLINK, RTM_SETLINK } from "./constants.ts";
 import { formatIfinfoPayload, parseIfinfoPayload, type TIfinfomsg } from "./ifinfo.ts";
+import { createAddressApi, type TAddressApi } from "./address.ts";
 import { createLinkApi, type TLinkApi } from "./link.ts";
 import type { TRtattr } from "./rtattr.ts";
 import { hostStructures, type TRtnetlinkStructures } from "./structures.ts";
@@ -35,6 +36,7 @@ type TRtnetlink = {
   // like talk(), but resolves with the errno reported by the kernel instead of rejecting
   tryTalk: (request: TLinkRequest) => Promise<TLinkTryTalkResult>;
   link: TLinkApi;
+  address: TAddressApi;
 };
 
 const linkMessageTypes = [RTM_NEWLINK, RTM_DELLINK, RTM_GETLINK, RTM_SETLINK];
@@ -112,6 +114,7 @@ const createRtnetlink = ({ netlink, structures = hostStructures }: {
     talk,
     tryTalk,
     link: createLinkApi({ rt: { talk, tryTalk }, structures }),
+    address: createAddressApi({ netlink, structures }),
   };
 };
 

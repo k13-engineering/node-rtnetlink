@@ -23,6 +23,41 @@ const canRunInNetworkNamespace = () => {
 
 const itInNetworkNamespace = canRunInNetworkNamespace() ? it : it.skip;
 
+type TObservedAddress = { family: string, address: string, prefixLength: number, nodad: boolean };
+
+// what the lifecycle script observed in the second network namespace
+type TNamespaceResult = {
+  outerNames: string[];
+  innerNames: string[];
+  outerLowerIndex: number;
+  macvtap: { linkIndex: number, linkinfo: unknown, up: boolean };
+  addressesAdded: TObservedAddress[];
+  addressesAfterRemove: TObservedAddress[];
+};
+
+// the kernel adds an IPv6 link-local address of its own once the link is up
+const withoutLinkLocal = ({ addresses }: { addresses: TObservedAddress[] }) => {
+  return addresses.filter(({ address }) => {
+    return !address.startsWith("fe80:");
+  });
+};
+
+const assertNamespaces = ({ namespaces }: { namespaces: TNamespaceResult }) => {
+  assert.ok(namespaces.outerNames.includes("nrt-lower1"));
+  assert.ok(!namespaces.outerNames.includes("nrt-nsmvt0") && !namespaces.outerNames.includes("nrt-move0"));
+  assert.deepStrictEqual(new Set(namespaces.innerNames), new Set(["lo", "nrt-move0", "nrt-nsmvt0"]));
+  assert.deepStrictEqual(namespaces.macvtap, {
+    linkIndex: namespaces.outerLowerIndex,
+    linkinfo: { kind: "macvtap", data: { mode: "bridge" } },
+    up: true,
+  });
+
+  const ipv4 = { family: "inet", address: "10.0.0.2", prefixLength: 24, nodad: false };
+  const ipv6 = { family: "inet6", address: "2001:db8::2", prefixLength: 64, nodad: true };
+  assert.deepStrictEqual(withoutLinkLocal({ addresses: namespaces.addressesAdded }), [ipv4, ipv6]);
+  assert.deepStrictEqual(withoutLinkLocal({ addresses: namespaces.addressesAfterRemove }), [ipv6]);
+};
+
 describe("node-rtnetlink on the host kernel", () => {
   it("should list the loopback link", async () => {
     await withRtnetlink({
@@ -77,19 +112,12 @@ describe("node-rtnetlink on the host kernel", () => {
     assert.deepStrictEqual(result.bridgeIndexes, [result.bridgeIndex]);
     assert.match(result.duplicate, /creating link failed with EEXIST/);
 
-    const { namespaces } = result;
-    assert.ok(namespaces.outerNames.includes("nrt-lower1"));
-    assert.ok(!namespaces.outerNames.includes("nrt-nsmvt0") && !namespaces.outerNames.includes("nrt-move0"));
-    assert.deepStrictEqual(new Set(namespaces.innerNames), new Set(["lo", "nrt-move0", "nrt-nsmvt0"]));
-    assert.deepStrictEqual(namespaces.macvtap, {
-      linkIndex: namespaces.outerLowerIndex,
-      linkinfo: { kind: "macvtap", data: { mode: "bridge" } },
-    });
     assert.deepStrictEqual(result.macvtap, {
       lowerIndex: result.macvtap.lowerIndex,
       linkIndex: result.macvtap.lowerIndex,
       linkinfo: { kind: "macvtap", data: { mode: "bridge" } },
     });
+    assertNamespaces({ namespaces: result.namespaces });
     assert.deepStrictEqual(result.remaining, ["lo"]);
   });
 });

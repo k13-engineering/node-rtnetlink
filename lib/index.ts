@@ -1,4 +1,12 @@
 import { createRtnetlink, isLinkMessageType, parseLinkMessage } from "./rtnetlink.ts";
+import {
+  addressInfoOf,
+  formatAddressFlags,
+  isAddressMessageType,
+  parseAddressFlags,
+  parseAddressMessage
+} from "./address.ts";
+import { formatIfaddrPayload, parseIfaddrPayload } from "./ifaddr.ts";
 import { formatIfinfoPayload, parseIfinfoPayload } from "./ifinfo.ts";
 import { formatIpAddress, parseIpAddress } from "./ip-address.ts";
 import {
@@ -31,8 +39,16 @@ export {
   parseLinkMessage,
   isLinkMessageType,
 
+  parseAddressMessage,
+  isAddressMessageType,
+  addressInfoOf,
+  formatAddressFlags,
+  parseAddressFlags,
+
   formatIfinfoPayload,
   parseIfinfoPayload,
+  formatIfaddrPayload,
+  parseIfaddrPayload,
 
   parseIpAddress,
   formatIpAddress,
@@ -81,6 +97,18 @@ export type {
 } from "./linkinfo.ts";
 export type { TLinkFlagName, TLinkFlags } from "./link-flags.ts";
 export type { TIfinfomsg, TIfinfoPayload } from "./ifinfo.ts";
+export type { TIfaddrmsg, TIfaddrPayload } from "./ifaddr.ts";
+export type {
+  TAddressApi,
+  TAddressInfo,
+  TAddAddressArgs,
+  TAddressMessage,
+  TAddressRequest,
+  TAddressTryTalkResult,
+  TAddressFlagName,
+  TAddressFlags,
+  TAddressScopeName,
+} from "./address.ts";
 export type { TAddressFamily, TIpAddress } from "./ip-address.ts";
 export type { TRtattr, TAttributeCodec } from "./rtattr.ts";
 export type { TRtnetlinkStructures } from "./structures.ts";
